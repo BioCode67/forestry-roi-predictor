@@ -3,6 +3,7 @@ import { computed, inject, ref } from 'vue'
 import EChart from '../components/EChart.vue'
 import MetricCard from '../components/MetricCard.vue'
 import SectionHead from '../components/SectionHead.vue'
+import PageHero from '../components/PageHero.vue'
 import { fmt } from '../lib/api'
 import { axisX, axisY, baseOption, palette, theme } from '../lib/charts'
 
@@ -68,12 +69,16 @@ const importanceOption = computed(() => {
 </script>
 
 <template>
+  <div>
+    <PageHero
+      src="/img/ridge.jpg"
+      eyebrow="모델 성능"
+      title="이 계산이 얼마나 맞나요"
+      lead="현행 산림청 공표 방식(단순 그룹 평균)을 같은 평가셋에서 예측기로 세워 비교했습니다. 학습에 한 번도 쓰이지 않은 자료로 산출한 값입니다."
+    />
+
   <main class="content">
     <div class="container">
-      <SectionHead
-        title="모델 성능"
-        desc="현행 산림청 공표 방식(단순 그룹 평균)을 동일 평가셋에서 예측기로 세워 비교했습니다. 학습에 한 번도 쓰이지 않은 Test 10%로 산출한 값입니다."
-      />
 
       <div class="tabs">
         <button class="tab" :class="{ 'tab--active': tab === 'a' }" @click="tab = 'a'">
@@ -191,4 +196,5 @@ const importanceOption = computed(() => {
       </template>
     </div>
   </main>
+  </div>
 </template>

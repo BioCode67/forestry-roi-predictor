@@ -1,6 +1,7 @@
 <script setup>
 import { computed, inject } from 'vue'
 import SectionHead from '../components/SectionHead.vue'
+import PageHero from '../components/PageHero.vue'
 import MetricCard from '../components/MetricCard.vue'
 import { fmt } from '../lib/api'
 
@@ -72,12 +73,16 @@ const PIPELINE = [
 </script>
 
 <template>
+  <div>
+    <PageHero
+      src="/img/hero.jpg"
+      eyebrow="데이터·방법론"
+      title="어떤 자료로 어떻게 계산했나요"
+      lead="산림청 국가승인통계 4종을 계층으로 결합하고, 공공데이터 3종을 융복합했습니다."
+    />
+
   <main class="content">
     <div class="container">
-      <SectionHead
-        title="데이터 · 방법론"
-        desc="산림청 국가승인통계 4종을 계층으로 결합하고, 공공데이터 2종을 융복합했습니다."
-      />
 
       <div v-if="ds" class="grid grid--4">
         <MetricCard accent label="Model A 분석 표본" :value="fmt.int(ds.rows)" unit="임가-연도"
@@ -231,4 +236,5 @@ const PIPELINE = [
       </div>
     </div>
   </main>
+  </div>
 </template>

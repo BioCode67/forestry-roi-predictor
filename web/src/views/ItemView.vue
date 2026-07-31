@@ -3,6 +3,7 @@ import { computed, inject, reactive, ref, watch } from 'vue'
 import EChart from '../components/EChart.vue'
 import MetricCard from '../components/MetricCard.vue'
 import SectionHead from '../components/SectionHead.vue'
+import PageHero from '../components/PageHero.vue'
 import DataState from '../components/DataState.vue'
 import { api, fmt } from '../lib/api'
 import { axisX, axisY, baseOption, palette, theme } from '../lib/charts'
@@ -180,13 +181,16 @@ const distOption = computed(() => {
 </script>
 
 <template>
+  <div>
+    <PageHero
+      src="/img/path.jpg"
+      eyebrow="작물별 정밀"
+      title="작물마다 자세히 들여다보기"
+      lead="임산물생산비조사는 비목별 지출과 작업 공정별 노동시간까지 담고 있어, 임가 단위 모델보다 훨씬 정밀한 진단이 가능합니다."
+    />
+
   <main class="content">
     <div class="container">
-      <SectionHead
-        title="품목별 정밀 진단"
-        desc="임산물생산비조사는 비목별 지출과 작업 공정별 노동시간까지 담고 있어, 임가 단위 모델보다 훨씬 정밀한 진단이 가능합니다."
-        badge="Model B · 임산물생산비조사" badge-kind="green"
-      />
 
       <div v-if="!items.length" class="note note--info">
         Model B가 아직 학습되지 않았습니다.
@@ -312,4 +316,5 @@ const distOption = computed(() => {
       </template>
     </div>
   </main>
+  </div>
 </template>

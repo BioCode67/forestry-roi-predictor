@@ -3,6 +3,7 @@ import { computed, inject, ref, watch } from 'vue'
 import EChart from '../components/EChart.vue'
 import MetricCard from '../components/MetricCard.vue'
 import SectionHead from '../components/SectionHead.vue'
+import PageHero from '../components/PageHero.vue'
 import DataState from '../components/DataState.vue'
 import FarmSidebar from '../components/FarmSidebar.vue'
 import { api, fmt } from '../lib/api'
@@ -229,6 +230,14 @@ const effOption = computed(() => {
 </script>
 
 <template>
+  <div>
+    <PageHero
+      src="/img/mountain.jpg"
+      eyebrow="자세한 진단"
+      title="임가 맞춤형 수익성 진단"
+      lead="임가경제조사 마이크로데이터로 학습한 모델의 상세 결과입니다."
+    />
+
   <div class="layout">
     <aside class="sidebar"><FarmSidebar /></aside>
 
@@ -367,5 +376,6 @@ const effOption = computed(() => {
         </DataState>
       </div>
     </main>
+  </div>
   </div>
 </template>

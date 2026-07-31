@@ -47,26 +47,22 @@ const NAV = [
 
 <template>
   <div class="app">
-    <header class="topbar" :class="{ 'topbar--float': floating }">
-      <div class="brand">
-        <div class="brand__mark" aria-hidden="true">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+    <header class="topbar">
+      <div class="topbar__bar">
+      <RouterLink to="/" class="brand">
+        <span class="brand__mark" aria-hidden="true">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
             <path d="M12 2 6.2 11h3L4.6 18h6.15v4h2.5v-4h6.15L15.8 11h3L12 2Z" />
           </svg>
-        </div>
-        <div class="brand__text">
-          <span class="brand__title">우리 산 수익 계산기</span>
-          <span class="brand__sub">전국 임가 조사 자료로 계산합니다</span>
-        </div>
-      </div>
+        </span>
+        <span class="brand__title">우리 산 수익 계산기</span>
+      </RouterLink>
 
       <nav class="nav">
         <RouterLink v-for="n in NAV" :key="n.to" :to="n.to">{{ n.label }}</RouterLink>
       </nav>
 
-      <div class="topbar__right">
-        <span v-if="health" class="badge badge--green nowrap">계산 준비됨</span>
-        <span v-else class="spinner" />
+      <RouterLink to="/" class="cta">계산해 보기</RouterLink>
       </div>
     </header>
 
