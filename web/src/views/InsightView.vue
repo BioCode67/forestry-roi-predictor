@@ -46,7 +46,7 @@ const gradeOption = computed(() => {
             ? `<br/>생산 임가 내 물량비중 ${fmt.dec(r.생산임가내_물량비중_pct, 0)}%` : '')
       } },
     xAxis: axisX({ data: rows.map((r) => r.구분) }),
-    yAxis: axisY({ name: '원 / 수량단위', axisLabel: { color: t.subtle, fontSize: 11.5,
+    yAxis: axisY({ name: 'kg당 원', axisLabel: { color: t.subtle, fontSize: 11.5,
       formatter: (v) => fmt.int(v) } }),
     series: [{
       type: 'bar', barWidth: '50%',
@@ -73,7 +73,7 @@ const ageOption = computed(() => {
       formatter: (ps) => `<b>${ps[0].axisValue}</b><br/>` +
         ps.map((p) => `${p.marker}${p.seriesName} ${fmt.dec(p.value)}%`).join('<br/>') },
     xAxis: axisX({ data: cats }),
-    yAxis: axisY({ name: 'ROI 중앙값 (%)', axisLabel: { color: t.subtle, fontSize: 11.5,
+    yAxis: axisY({ name: '수익률 (%)', axisLabel: { color: t.subtle, fontSize: 11.5,
       formatter: '{value}%' } }),
     series: keys.map((k, i) => ({
       name: k, type: 'line', smooth: 0.2, symbolSize: 8,
@@ -95,18 +95,18 @@ const leaderOption = computed(() => {
   const rest = labels.map((x) => leader.value.이외임가[`${x}_비중pct`] ?? null)
   return baseOption({
     grid: { left: 8, right: 14, top: 32, bottom: 8, containLabel: true },
-    legend: { data: ['선도임가', '이외임가'] },
+    legend: { data: ['잘하는 농가', '보통 농가'] },
     tooltip: { trigger: 'axis', backgroundColor: t.tooltipBg, borderColor: t.tooltipBorder,
       borderWidth: 1, textStyle: { color: t.text, fontSize: 12.5 },
       formatter: (ps) => `<b>${ps[0].axisValue}</b><br/>` +
         ps.map((p) => `${p.marker}${p.seriesName} ${fmt.dec(p.value)}%`).join('<br/>') },
     xAxis: axisX({ data: labels }),
-    yAxis: axisY({ name: '경영비 대비 비중 (%)', axisLabel: { color: t.subtle, fontSize: 11.5,
+    yAxis: axisY({ name: '쓴 돈 중 차지하는 몫 (%)', axisLabel: { color: t.subtle, fontSize: 11.5,
       formatter: '{value}%' } }),
     series: [
-      { name: '선도임가', type: 'bar', barWidth: '32%', data: lead,
+      { name: '잘하는 농가', type: 'bar', barWidth: '32%', data: lead,
         itemStyle: { color: palette.forest, borderRadius: [4, 4, 0, 0] } },
-      { name: '이외임가', type: 'bar', barWidth: '32%', data: rest,
+      { name: '보통 농가', type: 'bar', barWidth: '32%', data: rest,
         itemStyle: { color: palette.grey, opacity: 0.72, borderRadius: [4, 4, 0, 0] } },
     ],
   })
@@ -153,16 +153,16 @@ const regionOption = computed(() => {
   <main class="content">
     <div class="container">
       <SectionHead
-        title="수익 개선 인사이트"
-        desc="예측 모델이 '얼마를 벌 수 있는가'에 답한다면, 이 화면은 '어떻게 하면 더 벌 수 있는가'에 대한 정량 근거입니다. 기술통계 계층이며 예측 모델의 설명변수로는 쓰지 않습니다."
-        badge="임산물생산비조사" badge-kind="green"
+        title="어떻게 하면 더 벌 수 있을까요"
+        desc="앞 화면이 '얼마 남을까'였다면, 여기는 '무엇을 바꾸면 나아질까'입니다. 등급을 올릴 때, 나무 나이에 따라, 잘하는 농가와 비교했을 때 얼마나 차이가 나는지 실제 조사 자료로 확인해 보세요."
+        badge="전국 생산비 조사" badge-kind="green"
       />
 
       <DataState :loading="loading" :error="error">
         <template v-if="ins">
           <!-- ① 등급 단가 -->
           <div class="card">
-            <div class="card__head"><h3>품질 등급 · 가공 형태별 단가</h3></div>
+            <div class="card__head"><h3>등급을 올리면 얼마나 더 받나요</h3></div>
             <div class="card__body">
               <div class="chips" style="margin-bottom:14px">
                 <button v-for="i in gradeItems" :key="i" class="chip"
@@ -171,11 +171,11 @@ const regionOption = computed(() => {
               <div class="grid grid--32">
                 <EChart v-if="gradeOption" :option="gradeOption" height="300px" />
                 <div class="stack stack--md">
-                  <MetricCard v-if="grade?.직접비교_가능" accent label="최고 / 최저 단가 배수"
+                  <MetricCard v-if="grade?.직접비교_가능" accent label="제일 좋은 등급과 낮은 등급 차이"
                     :value="fmt.dec(grade.최고_최저_단가배수, 2)" unit="배" />
                   <div class="table-wrap">
                     <table>
-                      <thead><tr><th>{{ grade?.종류 }}</th><th class="num">단가</th><th class="num">생산 임가</th></tr></thead>
+                      <thead><tr><th>{{ grade?.종류 }}</th><th class="num">kg당 값</th><th class="num">이걸 내는 농가</th></tr></thead>
                       <tbody>
                         <tr v-for="r in grade?.등급" :key="r.구분">
                           <td>{{ r.구분 }}</td>
@@ -189,7 +189,7 @@ const regionOption = computed(() => {
                 </div>
               </div>
               <div v-if="sim" class="note note--good mt-md">
-                <strong>품질 개선 효과</strong> — {{ sim.전환_시나리오 }} 시 단위면적당 수취액
+                <strong>선별만 잘해도</strong> — {{ sim.전환_시나리오 }} 시 단위면적당 수취액
                 <b>{{ fmt.signed(sim.수취액_증가_원per단위면적, 0) === '—' ? '—'
                   : (sim.수취액_증가_원per단위면적 >= 0 ? '+' : '') + fmt.wonFull(sim.수취액_증가_원per단위면적) }}</b>
                 증가 (등급 간 단가차 {{ fmt.int(sim.단가차_원) }}원 × 전환 물량).
@@ -201,26 +201,27 @@ const regionOption = computed(() => {
           <!-- ② 수령 -->
           <div class="card mt-lg">
             <div class="card__head">
-              <h3>수령(樹齡)별 수익성 곡선</h3>
-              <span class="badge badge--amber">갱신·개식 판단</span>
+              <h3>나무가 몇 년생일 때 가장 잘 벌까요</h3>
+              <span class="badge badge--amber">나무 갱신 판단</span>
             </div>
             <div class="card__body">
               <EChart v-if="ageOption" :option="ageOption" height="330px" />
               <div class="grid grid--3 mt-md" style="gap:10px">
                 <MetricCard v-for="(v, k) in ins.수령별_수익성" :key="k"
-                  :label="`${k} 최고 수익 구간`" :value="v.최고구간"
+                  :label="`${k} — 가장 잘 버는 나이`" :value="v.최고구간"
                   :delta="`${fmt.dec(v.최고ROI, 0)}% · 최저 ${v.최저구간} ${fmt.dec(v.최저ROI, 0)}%`"
                   delta-dir="up" />
               </div>
               <p class="caveat mt-sm">
-                수익성이 정점을 지나 하락하는 구간은 갱신·개식 또는 수형 개선을 검토할 시점을 시사합니다.
+                수익이 꼭대기를 지나 내려가는 구간에 들어섰다면, 나무를 새로 심거나 수형을 손볼
+                시점인지 살펴보실 만합니다.
               </p>
             </div>
           </div>
 
           <!-- ③ 선도임가 -->
           <div class="card mt-lg">
-            <div class="card__head"><h3>선도임가 벤치마크 — 비목 구조의 차이</h3></div>
+            <div class="card__head"><h3>잘하는 농가는 어디에 돈을 쓰나요</h3></div>
             <div class="card__body">
               <div class="chips" style="margin-bottom:14px">
                 <button v-for="i in leaderItems" :key="i" class="chip"
@@ -230,34 +231,39 @@ const regionOption = computed(() => {
                 <EChart v-if="leaderOption" :option="leaderOption" height="290px" />
                 <div class="stack stack--md">
                   <div class="grid grid--2" style="gap:10px">
-                    <MetricCard label="선도임가 ROI"
+                    <MetricCard label="잘하는 농가 수익률"
                       :value="fmt.dec(leader?.선도임가?.ROI중앙값, 0)" unit="%" accent
-                      :delta="`표본 ${fmt.int(leader?.표본?.선도임가)}호`" delta-dir="flat" />
-                    <MetricCard label="이외임가 ROI"
+                      :delta="`${fmt.int(leader?.표본?.선도임가)}곳 조사`" delta-dir="flat" />
+                    <MetricCard label="보통 농가 수익률"
                       :value="fmt.dec(leader?.이외임가?.ROI중앙값, 0)" unit="%"
-                      :delta="`표본 ${fmt.int(leader?.표본?.이외임가)}호`" delta-dir="flat" />
+                      :delta="`${fmt.int(leader?.표본?.이외임가)}곳 조사`" delta-dir="flat" />
                   </div>
-                  <MetricCard label="총 노동시간 (선도 / 이외)"
+                  <MetricCard label="한 해 일한 시간 (잘하는 / 보통)"
                     :value="`${fmt.int(leader?.선도임가?.총노동시간)} / ${fmt.int(leader?.이외임가?.총노동시간)}`"
                     unit="시간" />
                 </div>
               </div>
               <div v-if="leader?.해석_유의" class="note note--warn mt-md fs-sm">
-                <strong>해석 유의</strong> — {{ leader.해석_유의 }}
+                <strong>참고하실 점</strong> — '잘하는 농가'는 조사에서 성과가 좋다고 분류된 곳이라
+              수익률 차이 자체가 크게 나오는 건 당연합니다. 눈여겨보실 부분은 수익률 숫자가 아니라
+              <b>돈을 어디에 얼마나 쓰는지의 차이</b>입니다.
               </div>
             </div>
           </div>
 
           <!-- ④ 지역×품목 -->
           <div class="card mt-lg">
-            <div class="card__head"><h3>지역 × 품목 수익성 지도</h3></div>
+            <div class="card__head"><h3>어느 지역에서 무엇이 잘 되나요</h3></div>
             <div class="card__body">
               <EChart v-if="regionOption" :option="regionOption" height="420px" />
-              <p class="caveat mt-sm">표본 15건 이상인 조합만 표시합니다.</p>
+              <p class="caveat mt-sm">조사된 농가가 15곳 이상인 경우만 표시합니다. 빈 칸은 자료가 적어 판단하기 어려운 조합입니다.</p>
             </div>
           </div>
 
-          <div class="note note--info mt-lg fs-sm">{{ ins.note }}</div>
+          <div class="note note--info mt-lg fs-sm">
+            여기 숫자들은 전국 농가를 조사한 결과를 정리한 것입니다. "이렇게 하면 반드시 이만큼 오른다"는
+            보장이 아니라 "이런 경향이 있다"는 참고 자료로 봐 주세요.
+          </div>
         </template>
       </DataState>
     </div>

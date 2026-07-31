@@ -60,7 +60,7 @@ const shipOption = computed(() => {
       },
     },
     xAxis: axisX({ data: names }),
-    yAxis: axisY({ name: '원/kg', axisLabel: { color: t.subtle, fontSize: 11.5,
+    yAxis: axisY({ name: 'kg당 원', axisLabel: { color: t.subtle, fontSize: 11.5,
       formatter: (v) => fmt.int(v) } }),
     series: [
       {
@@ -148,7 +148,7 @@ const kamisCharts = computed(() => {
             formatter: (ps) => `${ps[0].axisValue}월<br/>지수 <b>${fmt.dec(ps[0].value)}</b><br/>${
               fmt.int(d[ps[0].dataIndex].평균도매가격)}원/kg` },
           xAxis: axisX({ data: d.map((r) => r.월) }),
-          yAxis: axisY({ name: '가격지수 (전체 월 평균=100)' }),
+          yAxis: axisY({ name: '시세 수준 (1년 평균=100)' }),
           series: [{
             type: 'bar', barWidth: '58%',
             data: d.map((r) => ({
@@ -171,40 +171,39 @@ const kamisCharts = computed(() => {
   <main class="content">
     <div class="container">
       <SectionHead
-        title="출하 전략"
-        :desc="`${sectorLabel} 기준. 임업통계로 시기별 수취 단가를 추정하고, KAMIS 도매가로 월별 계절성을 보완합니다.`"
-        badge="임업경영실태조사 × KAMIS" badge-kind="sky"
+        title="언제, 어디에 팔면 좋을까요"
+        :desc="`${sectorLabel} 기준입니다. 같은 물건이라도 파는 시기와 파는 곳에 따라 받는 값이 달라집니다. 전국 농가가 실제로 언제·어디에 팔았고 얼마를 받았는지 조사한 자료로 계산했습니다.`"
+        badge="전국 임가 조사 자료" badge-kind="sky"
       />
 
       <!-- ① 임업통계 기반 -->
       <div v-if="m?.출하시기별_단가" class="section">
         <div class="card">
           <div class="card__head">
-            <h3>출하시기별 추정 수취 단가</h3>
+            <h3>언제 팔 때 값을 가장 잘 받나요</h3>
             <span class="badge badge--green">임업경영실태조사 {{ m.조사연도 }}</span>
           </div>
           <div class="card__body">
             <p class="fs-sm muted" style="margin-bottom:12px">
-              임가별로 관측되는 건 연간 평균 단가 하나뿐입니다. 임가마다 출하시기 구성비가 다르다는 점을
-              이용해 <span class="mono">단가 = Σ β·구성비</span> 를 비음수 최소제곱으로 추정했습니다.
-              막대의 오차선은 부트스트랩 90% 구간입니다.
+              농가마다 파는 시기 비중이 다릅니다. 그 차이를 이용해 시기별로 kg당 얼마를 받는지 되짚어
+              계산했습니다. 막대 위아래 선은 <b>계산의 여유 폭</b>으로, 짧을수록 확실한 숫자입니다.
             </p>
 
             <div class="grid grid--32">
               <EChart v-if="shipOption" :option="shipOption" height="320px" />
               <div class="stack stack--md">
                 <div class="grid grid--2" style="gap:10px">
-                  <MetricCard accent label="최적 출하시기"
+                  <MetricCard accent label="값 가장 잘 받는 시기"
                     :value="m.출하시기별_단가.최고시기"
                     :delta="`${fmt.int(m.출하시기별_단가.최고단가)}원/kg`" delta-dir="up" />
-                  <MetricCard label="최저 시기 대비"
+                  <MetricCard label="가장 쌀 때와 비교하면"
                     :value="fmt.dec(m.출하시기별_단가.격차_배, 2)" unit="배"
                     :delta="`${m.출하시기별_단가.최저시기} ${fmt.int(m.출하시기별_단가.최저단가)}원`"
                     delta-dir="flat" />
                 </div>
                 <div class="table-wrap">
                   <table>
-                    <thead><tr><th>출하시기</th><th class="num">추정단가</th><th class="num">평균비중</th></tr></thead>
+                    <thead><tr><th>파는 시기</th><th class="num">kg당 받는 값</th><th class="num">이때 파는 비중</th></tr></thead>
                     <tbody>
                       <tr v-for="(v, k) in m.출하시기별_단가.계열단가" :key="k"
                           :class="{ 'strong-row': k === m.출하시기별_단가.최고시기 }">
@@ -216,13 +215,15 @@ const kamisCharts = computed(() => {
                   </table>
                 </div>
                 <p v-if="m.출하시기별_단가.제외계열?.length" class="caveat">
-                  식별 불안정으로 제외: {{ m.출하시기별_단가.제외계열.join(', ') }}
+                  자료가 적어 계산에서 뺀 시기: {{ m.출하시기별_단가.제외계열.join(', ') }}
                 </p>
               </div>
             </div>
 
             <div class="note note--warn mt-md fs-sm">
-              <strong>해석 유의</strong> — {{ m.출하시기별_단가.주의 }}
+              <strong>참고하실 점</strong> — 이 숫자는 저장 경험이 있는 농가가 답한 자료를 바탕으로 합니다.
+              저장고를 갖춘 농가는 규모나 품질도 다를 수 있어서, "이 시기에 팔면 무조건 이만큼 받는다"는
+              뜻이 아니라 "이런 경향이 있다"로 봐 주세요.
             </div>
           </div>
         </div>
@@ -231,32 +232,32 @@ const kamisCharts = computed(() => {
       <!-- ② 판매처 · 저장 · 인증 -->
       <div v-if="m" class="grid grid--2 section">
         <div v-if="m.판매처별_단가" class="card">
-          <div class="card__head"><h3>판매처별 수취 단가</h3></div>
+          <div class="card__head"><h3>어디에 팔 때 값을 더 받나요</h3></div>
           <div class="card__body">
             <EChart v-if="channelOption" :option="channelOption" height="270px" />
             <p class="caveat mt-sm">
-              판매처 구성비 회귀 추정치입니다. 최고 {{ m.판매처별_단가.최고판매처 }} ·
-              최저 {{ m.판매처별_단가.최저판매처 }} ({{ m.판매처별_단가.격차_배 }}배).
+              {{ m.판매처별_단가.최고판매처 }}가 가장 높고 {{ m.판매처별_단가.최저판매처 }}가 가장 낮아
+              {{ m.판매처별_단가.격차_배 }}배 차이납니다. 농가마다 파는 곳 비중이 다른 점을 이용해 계산했습니다.
             </p>
           </div>
         </div>
 
         <div class="card">
-          <div class="card__head"><h3>저장·인증의 단가 효과</h3></div>
+          <div class="card__head"><h3>저장고와 인증이 값에 미치는 영향</h3></div>
           <div class="card__body">
             <div class="grid grid--2" style="gap:10px">
-              <MetricCard v-if="m.저장경험별_단가" label="저장 경험 단가차"
+              <MetricCard v-if="m.저장경험별_단가" label="저장고 쓰는 농가는"
                 :value="fmt.signed(m.저장경험별_단가.단가차_pct)" unit="%"
                 :delta="`${fmt.int(m.저장경험별_단가['저장경험 있음'].단가중앙값)}원 vs ${fmt.int(m.저장경험별_단가['저장경험 없음'].단가중앙값)}원`"
                 :delta-dir="m.저장경험별_단가.단가차_pct >= 0 ? 'up' : 'down'" />
-              <MetricCard v-if="m.공식인증_프리미엄" label="공식인증 프리미엄"
+              <MetricCard v-if="m.공식인증_프리미엄" label="인증 받은 농가는"
                 :value="fmt.signed(m.공식인증_프리미엄.프리미엄_pct)" unit="%"
                 :delta="`${fmt.int(m.공식인증_프리미엄['인증 보유'].단가중앙값)}원 vs ${fmt.int(m.공식인증_프리미엄['인증 없음'].단가중앙값)}원`"
                 :delta-dir="m.공식인증_프리미엄.프리미엄_pct >= 0 ? 'up' : 'down'" />
             </div>
             <p class="caveat mt-md">
-              저장 설비·자금 여력이나 인증 취득이 가능한 임가는 애초에 규모·품질이 다를 수 있습니다.
-              위 차이는 상관관계이며 순효과가 아닙니다.
+              저장고를 지을 여력이 있거나 인증을 받은 농가는 원래 규모와 품질이 다를 수 있습니다.
+              그러니 "저장고만 지으면 이만큼 오른다"기보다 "그런 농가들이 실제로 더 받고 있다"로 읽어 주세요.
             </p>
           </div>
         </div>
@@ -282,11 +283,11 @@ const kamisCharts = computed(() => {
               </div>
               <div class="card__body">
                 <div class="grid grid--3" style="gap:10px;margin-bottom:12px">
-                  <MetricCard accent label="최고 가격월" :value="`${c.item.추천월}월`"
+                  <MetricCard accent label="가장 비싼 달" :value="`${c.item.추천월}월`"
                     :delta="`지수 ${fmt.dec(c.item.추천월_가격지수, 0)}`" delta-dir="up" />
-                  <MetricCard label="최저 가격월" :value="`${c.item.최저월}월`"
+                  <MetricCard label="가장 싼 달" :value="`${c.item.최저월}월`"
                     :delta="`지수 ${fmt.dec(c.item.최저월_가격지수, 0)}`" delta-dir="down" />
-                  <MetricCard label="월간 최대 격차"
+                  <MetricCard label="비쌀 때와 쌀 때 차이"
                     :value="fmt.dec(c.item['최고최저_격차_pct'], 1)" unit="%p" />
                 </div>
                 <EChart :option="c.option" height="230px" />

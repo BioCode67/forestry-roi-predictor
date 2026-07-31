@@ -30,13 +30,14 @@ onMounted(async () => {
 })
 
 const NAV = [
-  { to: '/', label: '임가 진단' },
-  { to: '/item', label: '품목 정밀' },
-  { to: '/shipping', label: '출하 전략' },
-  { to: '/market', label: '시장·단가' },
-  { to: '/insight', label: '수익 개선' },
-  { to: '/model', label: '모델 성능' },
-  { to: '/about', label: '데이터·방법론' },
+  { to: '/', label: '얼마나 남을까' },
+  { to: '/shipping', label: '언제 팔까' },
+  { to: '/market', label: '값은 얼마' },
+  { to: '/insight', label: '더 버는 법' },
+  { to: '/detail', label: '자세한 진단' },
+  { to: '/item', label: '작물별 자세히' },
+  { to: '/model', label: '얼마나 맞나' },
+  { to: '/about', label: '쓰인 자료' },
 ]
 </script>
 
@@ -50,8 +51,8 @@ const NAV = [
           </svg>
         </div>
         <div class="brand__text">
-          <span class="brand__title">임가 수익성 분석 플랫폼</span>
-          <span class="brand__sub">산림청 국가승인통계 마이크로데이터 기반</span>
+          <span class="brand__title">우리 산 수익 계산기</span>
+          <span class="brand__sub">전국 임가 조사 자료로 계산합니다</span>
         </div>
       </div>
 
@@ -60,9 +61,7 @@ const NAV = [
       </nav>
 
       <div class="topbar__right">
-        <span v-if="health" class="badge badge--green nowrap">
-          모델 {{ [health.models.model_a, health.models.model_b].filter(Boolean).length }}종 가동
-        </span>
+        <span v-if="health" class="badge badge--green nowrap">계산 준비됨</span>
         <span v-else class="spinner" />
       </div>
     </header>

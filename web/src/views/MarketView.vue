@@ -34,20 +34,20 @@ const trendOption = computed(() => {
   const d = trend.value.연도별
   return baseOption({
     grid: { left: 8, right: 8, top: 32, bottom: 8, containLabel: true },
-    legend: { data: ['물량가중 단가', '생산량'] },
+    legend: { data: ['kg당 값', '생산량'] },
     tooltip: {
       trigger: 'axis', backgroundColor: t.tooltipBg, borderColor: t.tooltipBorder,
       borderWidth: 1, textStyle: { color: t.text, fontSize: 12.5 },
       formatter: (ps) => {
         const r = d[ps[0].dataIndex]
-        return `<b>${r.연도}년</b><br/>단가 <b>${fmt.int(r.가중평균단가)}원/kg</b>` +
+        return `<b>${r.연도}년</b><br/>kg당 <b>${fmt.int(r.가중평균단가)}원</b>` +
           `<br/>생산량 ${fmt.int(r.생산량 / 1000)}톤<br/>생산금액 ${fmt.won(r.생산금액)}` +
           `<br/>생산 시군구 ${r.시군구수}곳`
       },
     },
     xAxis: axisX({ data: d.map((r) => `${r.연도}`) }),
     yAxis: [
-      axisY({ name: '원/kg', axisLabel: { color: t.subtle, fontSize: 11.5, formatter: (v) => fmt.int(v) } }),
+      axisY({ name: 'kg당 원', axisLabel: { color: t.subtle, fontSize: 11.5, formatter: (v) => fmt.int(v) } }),
       axisY({ name: '톤', position: 'right', splitLine: { show: false },
         axisLabel: { color: t.subtle, fontSize: 11.5, formatter: (v) => fmt.int(v) } }),
     ],
@@ -55,7 +55,7 @@ const trendOption = computed(() => {
       { name: '생산량', type: 'bar', yAxisIndex: 1, barWidth: '38%',
         data: d.map((r) => r.생산량 / 1000),
         itemStyle: { color: palette.grey, opacity: 0.42, borderRadius: [4, 4, 0, 0] } },
-      { name: '물량가중 단가', type: 'line', smooth: 0.2, symbolSize: 9,
+      { name: 'kg당 값', type: 'line', smooth: 0.2, symbolSize: 9,
         data: d.map((r) => r.가중평균단가),
         lineStyle: { width: 3, color: palette.forest },
         itemStyle: { color: palette.forest } },
@@ -74,7 +74,7 @@ const premOption = computed(() => {
       borderWidth: 1, textStyle: { color: t.text, fontSize: 12.5 },
       formatter: (p) => {
         const r = rows[p.dataIndex]
-        return `<b>${r.시도}</b><br/>단가 ${fmt.int(r.가중평균단가)}원/kg<br/>전국 대비 ${
+        return `<b>${r.시도}</b><br/>kg당 ${fmt.int(r.가중평균단가)}원<br/>전국 대비 ${
           fmt.signed(r.전국대비_pct)}%<br/>생산량 ${fmt.int(r.생산량 / 1000)}톤`
       } },
     xAxis: axisY({ axisLabel: { color: t.subtle, fontSize: 11, formatter: '{value}%' } }),
@@ -103,7 +103,7 @@ const allTrendOption = computed(() => {
     grid: { left: 8, right: 52, top: 30, bottom: 8, containLabel: true },
     legend: {
       data: [
-        { name: '단가 변화 (녹색 상승 / 적색 하락)', itemStyle: { color: palette.forest } },
+        { name: '값 변화 (초록 오름 / 빨강 내림)', itemStyle: { color: palette.forest } },
         { name: '생산량 변화', itemStyle: { color: palette.grey } },
       ],
     },
@@ -114,7 +114,7 @@ const allTrendOption = computed(() => {
     xAxis: axisY({ axisLabel: { color: t.subtle, fontSize: 11, formatter: '{value}%' } }),
     yAxis: axisX({ data: rows.map((r) => r.item), axisLabel: { color: t.muted, fontSize: 11.5 } }),
     series: [
-      { name: '단가 변화 (녹색 상승 / 적색 하락)', type: 'bar', barWidth: '34%',
+      { name: '값 변화 (초록 오름 / 빨강 내림)', type: 'bar', barWidth: '34%',
         data: rows.map((r) => ({ value: r.chg,
           itemStyle: { color: r.chg >= 0 ? palette.forest : palette.rose } })),
         label: { show: true, position: 'right', color: t.muted, fontSize: 10.5,
@@ -130,9 +130,9 @@ const allTrendOption = computed(() => {
   <main class="content">
     <div class="container">
       <SectionHead
-        title="임산물 시장 · 단가"
-        :desc="prod ? `${prod.연도[0]}~${prod.연도.at(-1)}년 · 시군구×품목 ${fmt.int(prod.관측)}개 관측. KAMIS가 다루지 않는 밤·대추·떫은감·표고·산나물의 실측 단가를 임업통계만으로 확보합니다.` : ''"
-        badge="임산물생산조사" badge-kind="green"
+        title="내 작물은 kg당 얼마 받나요"
+        :desc="prod ? `전국 시·군마다 실제로 얼마에 팔렸는지 조사한 자료입니다 (${prod.연도[0]}~${prod.연도.at(-1)}년, ${fmt.int(prod.관측)}건). 같은 작물이라도 지역마다 받는 값이 꽤 다릅니다.` : ''"
+        badge="전국 임산물 생산 조사" badge-kind="green"
       />
 
       <DataState :loading="loading" :error="error">
@@ -143,16 +143,16 @@ const allTrendOption = computed(() => {
           </div>
 
           <div v-if="last" class="grid grid--4">
-            <MetricCard accent :label="`${last.연도}년 전국 단가`"
+            <MetricCard accent :label="`${last.연도}년 전국 평균값`"
               :value="fmt.int(last.가중평균단가)" unit="원/kg"
               :delta="`${fmt.signed(trend.단가_변화율_pct)}% (${prod.연도[0]}년 대비)`"
               :delta-dir="trend.단가_변화율_pct >= 0 ? 'up' : 'down'" />
-            <MetricCard label="생산량 변화" :value="fmt.signed(trend.생산량_변화율_pct)" unit="%"
+            <MetricCard label="전국 생산량 변화" :value="fmt.signed(trend.생산량_변화율_pct)" unit="%"
               :delta-dir="trend.생산량_변화율_pct >= 0 ? 'up' : 'down'"
               :delta="`${fmt.int(last.생산량 / 1000)}톤`" />
-            <MetricCard label="시장 규모" :value="fmt.won(last.생산금액)"
+            <MetricCard label="전국에서 팔린 금액" :value="fmt.won(last.생산금액)"
               :delta="`생산 시군구 ${last.시군구수}곳`" delta-dir="flat" />
-            <MetricCard v-if="prem" label="지역 단가 격차"
+            <MetricCard v-if="prem" label="지역별 값 차이"
               :value="fmt.dec(prem.지역격차_배, 2)" unit="배"
               :delta="`${prem.최고지역} ${fmt.int(prem.최고단가)}원 vs ${prem.최저지역} ${fmt.int(prem.최저단가)}원`"
               delta-dir="flat" />
@@ -160,18 +160,19 @@ const allTrendOption = computed(() => {
 
           <div class="grid grid--2 mt-lg">
             <div class="card">
-              <div class="card__head"><h3>단가 · 생산량 추이</h3></div>
+              <div class="card__head"><h3>몇 해 동안 값이 어떻게 변했나요</h3></div>
               <div class="card__body"><EChart v-if="trendOption" :option="trendOption" height="300px" /></div>
             </div>
             <div class="card">
               <div class="card__head">
-                <h3>시도별 단가 프리미엄</h3>
+                <h3>어느 지역이 값을 더 받나요</h3>
                 <span v-if="prem" class="badge badge--grey">{{ prem.연도 }}년</span>
               </div>
               <div class="card__body">
                 <EChart v-if="premOption" :option="premOption" height="300px" />
                 <p v-if="prem" class="caveat mt-sm">
-                  전국 물량가중 평균 {{ fmt.int(prem.전국_가중평균단가) }}원/kg 대비 편차입니다.
+                  전국 평균 {{ fmt.int(prem.전국_가중평균단가) }}원/kg을 기준으로, 얼마나 높고 낮은지입니다.
+                  값이 높은 지역은 품종·등급 구성이나 파는 곳이 다를 수 있습니다.
                 </p>
               </div>
             </div>
@@ -179,16 +180,17 @@ const allTrendOption = computed(() => {
 
           <div v-if="spec" class="card mt-lg">
             <div class="card__head">
-              <h3>{{ picked }} 주산지 특화도 (LQ)</h3>
+              <h3>{{ picked }}은 어디가 주산지인가요</h3>
               <span class="badge badge--sky">{{ spec.연도 }}년</span>
             </div>
             <div class="card__body">
               <p class="fs-sm muted" style="margin-bottom:10px">
-                LQ = 지역 내 해당 품목 생산금액 비중 ÷ 전국 비중. 1보다 크면 그 지역이 특화되어 있다는 뜻입니다.
+                숫자가 클수록 그 지역이 이 작물에 집중한다는 뜻입니다. 1이면 전국 평균 수준,
+                2면 평균의 두 배로 집중된 주산지입니다.
               </p>
               <div class="table-wrap">
                 <table>
-                  <thead><tr><th>시도</th><th class="num">LQ</th><th class="num">생산금액</th><th class="num">전국 비중</th></tr></thead>
+                  <thead><tr><th>지역</th><th class="num">집중도</th><th class="num">팔린 금액</th><th class="num">전국에서 차지하는 몫</th></tr></thead>
                   <tbody>
                     <tr v-for="(r, i) in spec.상위지역" :key="r.시도" :class="{ 'strong-row': i === 0 }">
                       <td>{{ r.시도 }}</td>
@@ -203,17 +205,18 @@ const allTrendOption = computed(() => {
           </div>
 
           <div class="card mt-lg">
-            <div class="card__head"><h3>전 품목 단가 · 생산량 변화</h3></div>
+            <div class="card__head"><h3>다른 작물들은 어떤가요</h3></div>
             <div class="card__body">
               <EChart v-if="allTrendOption" :option="allTrendOption" height="400px" />
               <p class="caveat mt-sm">
-                대부분 품목에서 생산량이 줄고 단가가 오르는 구조가 나타납니다.
+                대부분 작물에서 생산량은 줄고 값은 오르는 흐름입니다. 기르는 사람이 줄어드는 만큼
+                값이 받쳐준다는 뜻이기도 합니다.
               </p>
             </div>
           </div>
 
           <div v-if="prod.가공부가가치 && Object.keys(prod.가공부가가치).length" class="section mt-lg">
-            <SectionHead title="1차 가공의 경제성" />
+            <SectionHead title="말리거나 가공하면 이득일까요" />
             <div v-for="(v, k) in prod.가공부가가치" :key="k" class="card">
               <div class="card__head">
                 <h3>{{ k }}</h3>
@@ -223,17 +226,17 @@ const allTrendOption = computed(() => {
               </div>
               <div class="card__body">
                 <div class="grid grid--4" style="gap:10px">
-                  <MetricCard label="원물 단가" :value="fmt.int(v.원물_단가)" unit="원/kg" />
-                  <MetricCard label="가공품 단가" :value="fmt.int(v.가공품_단가)" unit="원/kg" />
-                  <MetricCard label="실제 단가 배수" :value="fmt.dec(v.단가_배수, 2)" unit="배" />
-                  <MetricCard label="손익분기 배수" :value="fmt.dec(v.손익분기_배수, 1)" unit="배"
-                    accent :delta="`건조수율 ${v.건조수율}`" delta-dir="flat" />
+                  <MetricCard label="그대로 팔 때" :value="fmt.int(v.원물_단가)" unit="원/kg" />
+                  <MetricCard label="가공해서 팔 때" :value="fmt.int(v.가공품_단가)" unit="원/kg" />
+                  <MetricCard label="값이 몇 배 되나" :value="fmt.dec(v.단가_배수, 2)" unit="배" />
+                  <MetricCard label="몇 배는 돼야 이득" :value="fmt.dec(v.손익분기_배수, 1)" unit="배"
+                    accent :delta="`말리면 무게가 ${Math.round(1/v.건조수율)}분의 1로 줄어듭니다`" delta-dir="flat" />
                 </div>
                 <div class="note mt-md"
                      :class="v.판정 === '가공이 유리' ? 'note--good' : 'note--warn'">
-                  {{ v.해석 }} 원물 1kg을 가공해 얻는 수취액은
-                  <b>{{ fmt.int(v.원물1kg당_가공수취액) }}원</b>으로, 원물 직판({{ fmt.int(v.원물_단가) }}원)
-                  대비 <b>{{ fmt.signed(v.원물직판대비_pct) }}%</b>입니다.
+                  {{ v.해석 }} 그대로 1kg을 팔면 {{ fmt.int(v.원물_단가) }}원인데,
+                  같은 1kg을 가공해 팔면 <b>{{ fmt.int(v.원물1kg당_가공수취액) }}원</b>이 됩니다.
+                  <b>{{ fmt.signed(v.원물직판대비_pct) }}%</b> 차이입니다.
                 </div>
                 <p class="caveat mt-sm">{{ v.주의 }}</p>
               </div>
@@ -241,12 +244,12 @@ const allTrendOption = computed(() => {
           </div>
 
           <div class="card mt-lg">
-            <div class="card__head"><h3>분석 전제</h3></div>
+            <div class="card__head"><h3>이 숫자를 볼 때 참고하실 점</h3></div>
             <div class="card__body">
               <p class="fs-sm muted">{{ prod.주의 }}</p>
               <p class="fs-sm muted mt-sm">
-                단가는 관측치 단순평균이 아니라 <b>생산금액 ÷ 생산량</b>(물량가중)으로 계산했습니다.
-                소규모 시군구의 특이 단가가 전국 평균을 왜곡하지 않도록 하기 위함입니다.
+                값은 시·군을 그냥 평균 낸 것이 아니라 <b>팔린 금액을 판 무게로 나눠</b> 구했습니다.
+                생산량이 아주 적은 지역의 특이한 값이 전국 평균을 흔들지 않도록 하기 위해서입니다.
               </p>
             </div>
           </div>
