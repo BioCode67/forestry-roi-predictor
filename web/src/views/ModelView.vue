@@ -6,7 +6,7 @@ import SectionHead from '../components/SectionHead.vue'
 import PageHero from '../components/PageHero.vue'
 import StatStrip from '../components/StatStrip.vue'
 import { fmt } from '../lib/api'
-import { axisX, axisY, baseOption, palette, theme } from '../lib/charts'
+import { axisX, axisY, barH, barV, baseOption, palette, theme, tip } from '../lib/charts'
 
 const meta = inject('meta')
 const tab = ref('a')
@@ -50,16 +50,9 @@ function benchOption(metricKey, dec) {
     xAxis: axisX({ data: b.rows.map((r) => r.label),
       axisLabel: { color: t.subtle, fontSize: 10.5, interval: 0, width: 90, overflow: 'break' } }),
     yAxis: axisY(),
-    series: [{
-      type: 'bar', barWidth: '46%',
-      data: b.rows.map((r, i) => ({
-        value: r[metricKey],
-        itemStyle: { color: i === b.rows.length - 1 ? palette.forest : palette.grey,
-          opacity: i === b.rows.length - 1 ? 1 : 0.62, borderRadius: [5, 5, 0, 0] },
-      })),
-      label: { show: true, position: 'top', color: t.muted, fontSize: 11, fontWeight: 600,
-        formatter: (p) => fmt.dec(p.value, dec) },
-    }],
+    series: [barV(b.rows.map((r) => r[metricKey]), {
+      highlight: b.rows.length - 1, width: '44%',
+      label: (p) => fmt.dec(p.value, dec) })],
   })
 }
 
@@ -76,11 +69,8 @@ const importanceOption = computed(() => {
       formatter: (p) => `${p.name}<br/>Gain <b>${fmt.int(p.value)}</b>` },
     xAxis: axisY({ axisLabel: { show: false }, splitLine: { show: false } }),
     yAxis: axisX({ data: rows.map((r) => r[0]), axisLabel: { color: t.muted, fontSize: 11 } }),
-    series: [{
-      type: 'bar', barWidth: '66%',
-      data: rows.map((r) => r[1]),
-      itemStyle: { color: palette.forest, opacity: 0.85, borderRadius: [0, 4, 4, 0] },
-    }],
+    series: [barH(rows.map((r) => r[1]),
+      { highlight: rows.length - 1, width: '68%' })],
   })
 })
 </script>

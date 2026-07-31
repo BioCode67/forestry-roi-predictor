@@ -8,7 +8,7 @@ import StatStrip from '../components/StatStrip.vue'
 import PageHead from '../components/PageHead.vue'
 import DataState from '../components/DataState.vue'
 import { api, fmt } from '../lib/api'
-import { axisX, axisY, baseOption, palette, theme } from '../lib/charts'
+import { axisX, axisY, barH, barV, baseOption, palette, refLine, theme, tip, vGrad } from '../lib/charts'
 
 const meta = inject('meta')
 const farm = inject('farm')
@@ -83,16 +83,7 @@ const shipOption = computed(() => {
     yAxis: axisY({ name: 'kg당 원', axisLabel: { color: t.subtle, fontSize: 11.5,
       formatter: (v) => fmt.int(v) } }),
     series: [
-      {
-        type: 'bar', barWidth: '48%',
-        data: vals.map((v, i) => ({
-          value: v,
-          itemStyle: { color: i === hi ? palette.forest : palette.grey,
-            borderRadius: [5, 5, 0, 0], opacity: i === hi ? 1 : 0.7 },
-        })),
-        label: { show: true, position: 'top', formatter: (p) => `${fmt.int(p.value)}원`,
-          color: t.muted, fontSize: 11.5, fontWeight: 600 },
-      },
+      barV(vals, { highlight: hi, label: (p) => `${fmt.int(p.value)}원`, width: '46%' }),
       {
         type: 'custom', silent: true,
         renderItem: (params, apiFn) => {
@@ -137,16 +128,8 @@ const channelOption = computed(() => {
     xAxis: axisY({ axisLabel: { show: false }, splitLine: { show: false } }),
     yAxis: axisX({ data: rows.map((r) => r[0]),
       axisLabel: { color: t.muted, fontSize: 11.5 } }),
-    series: [{
-      type: 'bar', barWidth: '58%',
-      data: rows.map((r, i) => ({
-        value: r[1],
-        itemStyle: { color: i === rows.length - 1 ? palette.forest : palette.grey,
-          borderRadius: [0, 4, 4, 0], opacity: i === rows.length - 1 ? 1 : 0.72 },
-      })),
-      label: { show: true, position: 'right', formatter: (p) => `${fmt.int(p.value)}원`,
-        color: t.muted, fontSize: 11 },
-    }],
+    series: [barH(rows.map((r) => r[1]),
+      { highlight: rows.length - 1, label: (p) => `${fmt.int(p.value)}원` })],
   })
 })
 
@@ -170,16 +153,9 @@ const kamisCharts = computed(() => {
           xAxis: axisX({ data: d.map((r) => r.월) }),
           yAxis: axisY({ name: '시세 수준 (1년 평균=100)' }),
           series: [{
-            type: 'bar', barWidth: '58%',
-            data: d.map((r) => ({
-              value: r.가격지수,
-              itemStyle: { color: r.월 === it.추천월 ? palette.forest : palette.grey,
-                borderRadius: [4, 4, 0, 0], opacity: r.월 === it.추천월 ? 1 : 0.62 },
-            })),
-            markLine: { symbol: 'none', silent: true,
-              lineStyle: { color: t.axis, type: 'dashed' },
-              label: { formatter: '평균', color: t.subtle, fontSize: 10.5 },
-              data: [{ yAxis: 100 }] },
+            ...barV(d.map((r) => r.가격지수), {
+              highlight: d.findIndex((r) => r.월 === it.추천월), width: '56%' }),
+            markLine: refLine(100, '1년 평균'),
           }],
         }),
       }

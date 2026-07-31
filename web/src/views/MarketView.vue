@@ -9,7 +9,8 @@ import RegionMap from '../components/RegionMap.vue'
 import PageHead from '../components/PageHead.vue'
 import DataState from '../components/DataState.vue'
 import { api, fmt } from '../lib/api'
-import { axisX, axisY, baseOption, palette, theme } from '../lib/charts'
+import { areaGrad, axisX, axisY, barDiverging, barH, baseOption, lineArea,
+  palette, refLine, theme, tip, vGrad } from '../lib/charts'
 
 const prod = ref(null)
 const loading = ref(true)
@@ -75,13 +76,17 @@ const trendOption = computed(() => {
         axisLabel: { color: t.subtle, fontSize: 11.5, formatter: (v) => fmt.int(v) } }),
     ],
     series: [
-      { name: '생산량', type: 'bar', yAxisIndex: 1, barWidth: '38%',
+      { name: '생산량', type: 'bar', yAxisIndex: 1, barWidth: '42%',
         data: d.map((r) => r.생산량 / 1000),
-        itemStyle: { color: palette.grey, opacity: 0.42, borderRadius: [4, 4, 0, 0] } },
-      { name: 'kg당 값', type: 'line', smooth: 0.2, symbolSize: 9,
+        itemStyle: { color: vGrad(palette.grey, 0.5, 0.22), borderRadius: [7, 7, 0, 0] },
+        animationDuration: 620 },
+      { name: 'kg당 값', type: 'line', smooth: 0.28, symbolSize: 11,
         data: d.map((r) => r.가중평균단가),
-        lineStyle: { width: 3, color: palette.forest },
-        itemStyle: { color: palette.forest } },
+        lineStyle: { width: 3.4, color: palette.forest,
+          shadowColor: 'rgba(46,125,79,.3)', shadowBlur: 10, shadowOffsetY: 3 },
+        itemStyle: { color: '#fff', borderColor: palette.forest, borderWidth: 3 },
+        areaStyle: { color: areaGrad(palette.forest, 0.14) },
+        animationDuration: 900 },
     ],
   })
 })
@@ -102,16 +107,8 @@ const premOption = computed(() => {
       } },
     xAxis: axisY({ axisLabel: { color: t.subtle, fontSize: 11, formatter: '{value}%' } }),
     yAxis: axisX({ data: rows.map((r) => r.시도), axisLabel: { color: t.muted, fontSize: 11.5 } }),
-    series: [{
-      type: 'bar', barWidth: '62%',
-      data: rows.map((r) => ({
-        value: r.전국대비_pct,
-        itemStyle: { color: r.전국대비_pct >= 0 ? palette.forest : palette.rose,
-          borderRadius: r.전국대비_pct >= 0 ? [0, 4, 4, 0] : [4, 0, 0, 4], opacity: 0.9 },
-      })),
-      label: { show: true, position: 'right', color: t.muted, fontSize: 10.5,
-        formatter: (p) => `${fmt.signed(p.value, 0)}%` },
-    }],
+    series: [barDiverging(rows.map((r) => r.전국대비_pct),
+      { label: (p) => `${fmt.signed(p.value, 0)}%` })],
   })
 })
 
@@ -137,13 +134,14 @@ const allTrendOption = computed(() => {
     xAxis: axisY({ axisLabel: { color: t.subtle, fontSize: 11, formatter: '{value}%' } }),
     yAxis: axisX({ data: rows.map((r) => r.item), axisLabel: { color: t.muted, fontSize: 11.5 } }),
     series: [
-      { name: '값 변화 (초록 오름 / 빨강 내림)', type: 'bar', barWidth: '34%',
-        data: rows.map((r) => ({ value: r.chg,
-          itemStyle: { color: r.chg >= 0 ? palette.forest : palette.rose } })),
-        label: { show: true, position: 'right', color: t.muted, fontSize: 10.5,
-          formatter: (p) => `${fmt.signed(p.value, 0)}%` } },
-      { name: '생산량 변화', type: 'bar', barWidth: '34%',
-        data: rows.map((r) => ({ value: r.prod, itemStyle: { color: palette.grey, opacity: 0.6 } })) },
+      { ...barDiverging(rows.map((r) => r.chg), { label: (p) => `${fmt.signed(p.value, 0)}%`, width: '36%' }),
+        name: '값 변화 (초록 오름 / 빨강 내림)' },
+      { name: '생산량 변화', type: 'bar', barWidth: '36%',
+        data: rows.map((r) => ({
+          value: r.prod,
+          itemStyle: { color: 'rgba(148,163,184,.45)',
+            borderRadius: r.prod >= 0 ? [0, 5, 5, 0] : [5, 0, 0, 5] },
+        })), animationDuration: 620 },
     ],
   })
 })
@@ -231,7 +229,7 @@ const allTrendOption = computed(() => {
             </div>
             <div class="card__body">
               <p class="fs-sm muted" style="margin-bottom:10px">
-                숫자가 클수록 그 지역이 이 작물에 집중한다는 뜻입니다. 1이면 전국 평균 수준,
+                숫자가 클수록 그 지역이 이 작물에 집중하고 있다는 뜻입니다. 1이면 전국 평균 수준,
                 2면 평균의 두 배로 집중된 주산지입니다.
               </p>
               <div class="table-wrap">
@@ -256,7 +254,7 @@ const allTrendOption = computed(() => {
               <EChart v-if="allTrendOption" :option="allTrendOption" height="400px" />
               <p class="caveat mt-sm">
                 대부분 작물에서 생산량은 줄고 값은 오르는 흐름입니다. 기르는 사람이 줄어드는 만큼
-                값이 받쳐준다는 뜻이기도 합니다.
+                값이 받쳐주고 있다는 뜻이기도 합니다.
               </p>
             </div>
           </div>

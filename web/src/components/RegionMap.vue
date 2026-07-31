@@ -8,7 +8,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { echarts } from '../lib/charts'
 import EChart from './EChart.vue'
 import { fmt } from '../lib/api'
-import { axisX, baseOption, theme } from '../lib/charts'
+import { axisX, barH, baseOption, hGrad, palette, refLine, theme } from '../lib/charts'
 
 const props = defineProps({
   stats: { type: Object, default: null },   // { 지역: [...], 전국단가, ... }
@@ -91,23 +91,21 @@ const rankOption = computed(() => {
     yAxis: axisX({ data: merged.map((r) => r.지역),
       axisLabel: { color: t.muted, fontSize: 11 } }),
     series: [{
-      type: 'bar', barWidth: '62%',
+      type: 'bar', barWidth: '64%',
       data: merged.map((r, i) => ({
         value: r.단가,
         itemStyle: {
-          color: i >= bottom.length ? '#2e7d4f' : '#c2cacf',
-          borderRadius: [0, 4, 4, 0],
-          opacity: i >= bottom.length ? 0.95 : 0.8,
+          color: i >= bottom.length ? hGrad(palette.forest, 0.62, 1)
+                                    : hGrad(palette.grey, 0.3, 0.55),
+          borderRadius: [0, 6, 6, 0],
         },
       })),
-      label: { show: true, position: 'right', color: t.muted, fontSize: 10.5,
+      label: { show: true, position: 'right', distance: 7,
+        color: t.muted, fontSize: 10.5, fontWeight: 600,
         formatter: (p) => `${fmt.int(p.value)}원` },
-      markLine: {
-        symbol: 'none', silent: true,
-        lineStyle: { color: '#d97706', type: 'dashed', width: 1.5 },
-        label: { formatter: '전국 평균', color: '#d97706', fontSize: 10.5, position: 'end' },
-        data: [{ xAxis: props.stats.전국단가 }],
-      },
+      markLine: refLine(props.stats.전국단가, '전국 평균', { axis: 'x' }),
+      animationDuration: 640, animationEasing: 'cubicOut',
+      animationDelay: (i) => i * 34,
     }],
   })
 })

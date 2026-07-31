@@ -8,7 +8,7 @@ import StatStrip from '../components/StatStrip.vue'
 import PageHead from '../components/PageHead.vue'
 import DataState from '../components/DataState.vue'
 import { api, fmt } from '../lib/api'
-import { axisX, axisY, baseOption, palette, theme } from '../lib/charts'
+import { areaGrad, axisX, axisY, barV, baseOption, palette, theme, tip, vGrad } from '../lib/charts'
 
 const ins = ref(null)
 const loading = ref(true)
@@ -70,14 +70,7 @@ const gradeOption = computed(() => {
     xAxis: axisX({ data: rows.map((r) => r.구분) }),
     yAxis: axisY({ name: 'kg당 원', axisLabel: { color: t.subtle, fontSize: 11.5,
       formatter: (v) => fmt.int(v) } }),
-    series: [{
-      type: 'bar', barWidth: '50%',
-      data: vals.map((v, i) => ({ value: v,
-        itemStyle: { color: i === hi ? palette.forest : palette.grey,
-          borderRadius: [5, 5, 0, 0], opacity: i === hi ? 1 : 0.7 } })),
-      label: { show: true, position: 'top', color: t.muted, fontSize: 11,
-        formatter: (p) => `${fmt.int(p.value)}원` },
-    }],
+    series: [barV(vals, { highlight: hi, label: (p) => `${fmt.int(p.value)}원`, width: '48%' })],
   })
 })
 
@@ -98,10 +91,13 @@ const ageOption = computed(() => {
     yAxis: axisY({ name: '수익률 (%)', axisLabel: { color: t.subtle, fontSize: 11.5,
       formatter: '{value}%' } }),
     series: keys.map((k, i) => ({
-      name: k, type: 'line', smooth: 0.2, symbolSize: 8,
+      name: k, type: 'line', smooth: 0.3, symbolSize: 10,
       data: cats.map((c) => a[k].구간.find((r) => r.수령구간 === c)?.ROI중앙값 ?? null),
-      lineStyle: { width: 2.8, color: palette.series[i] },
-      itemStyle: { color: palette.series[i] },
+      lineStyle: { width: 3.2, color: palette.series[i],
+        shadowColor: palette.series[i], shadowBlur: 8, shadowOffsetY: 3, opacity: 0.95 },
+      itemStyle: { color: '#fff', borderColor: palette.series[i], borderWidth: 2.6 },
+      emphasis: { focus: 'series' },
+      animationDuration: 900,
     })).concat([{
       type: 'line', name: '', silent: true, symbol: 'none', data: cats.map(() => 0),
       lineStyle: { color: t.axis, type: 'dashed', width: 1 }, tooltip: { show: false },
@@ -126,10 +122,12 @@ const leaderOption = computed(() => {
     yAxis: axisY({ name: '쓴 돈 중 차지하는 몫 (%)', axisLabel: { color: t.subtle, fontSize: 11.5,
       formatter: '{value}%' } }),
     series: [
-      { name: '잘하는 농가', type: 'bar', barWidth: '32%', data: lead,
-        itemStyle: { color: palette.forest, borderRadius: [4, 4, 0, 0] } },
-      { name: '보통 농가', type: 'bar', barWidth: '32%', data: rest,
-        itemStyle: { color: palette.grey, opacity: 0.72, borderRadius: [4, 4, 0, 0] } },
+      { name: '잘하는 농가', type: 'bar', barWidth: '34%', data: lead,
+        itemStyle: { color: vGrad(palette.forest), borderRadius: [6, 6, 0, 0] },
+        animationDuration: 620 },
+      { name: '보통 농가', type: 'bar', barWidth: '34%', data: rest,
+        itemStyle: { color: vGrad(palette.grey, 0.55, 0.28), borderRadius: [6, 6, 0, 0] },
+        animationDuration: 620, animationDelay: 90 },
     ],
   })
 })

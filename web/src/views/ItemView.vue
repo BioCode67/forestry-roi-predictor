@@ -6,7 +6,7 @@ import SectionHead from '../components/SectionHead.vue'
 import PageHero from '../components/PageHero.vue'
 import DataState from '../components/DataState.vue'
 import { api, fmt } from '../lib/api'
-import { axisX, axisY, baseOption, palette, theme } from '../lib/charts'
+import { areaGrad, axisX, axisY, baseOption, palette, theme, tip, vGrad } from '../lib/charts'
 
 const meta = inject('meta')
 
@@ -90,10 +90,12 @@ const structOption = computed(() => {
     yAxis: axisY({ name: '경영비 대비 비중 (%)', axisLabel: { color: t.subtle, fontSize: 11.5,
       formatter: '{value}%' } }),
     series: [
-      { name: '귀 임가', type: 'bar', barWidth: '32%', data: rows.map((r) => r.mine),
-        itemStyle: { color: palette.forest, borderRadius: [4, 4, 0, 0] } },
-      { name: '선도임가 중앙값', type: 'bar', barWidth: '32%', data: rows.map((r) => r.leader),
-        itemStyle: { color: palette.grey, opacity: 0.7, borderRadius: [4, 4, 0, 0] } },
+      { name: '귀 임가', type: 'bar', barWidth: '34%', data: rows.map((r) => r.mine),
+        itemStyle: { color: vGrad(palette.forest), borderRadius: [6, 6, 0, 0] },
+        animationDuration: 620 },
+      { name: '선도임가 중앙값', type: 'bar', barWidth: '34%', data: rows.map((r) => r.leader),
+        itemStyle: { color: vGrad(palette.grey, 0.55, 0.28), borderRadius: [6, 6, 0, 0] },
+        animationDuration: 620, animationDelay: 90 },
     ],
   })
 })
@@ -126,8 +128,7 @@ const curveOption = computed(() => {
       { name: '예측 ROI', type: 'line', smooth: 0.25, symbol: 'none',
         data: c.map((p) => [p.cost, p.roi]),
         lineStyle: { width: 3, color: palette.forest },
-        areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [
-          { offset: 0, color: 'rgba(46,125,79,.18)' }, { offset: 1, color: 'rgba(46,125,79,0)' }] } },
+        areaStyle: { color: areaGrad(palette.forest, 0.2) },
         markLine: { symbol: 'none', silent: true,
           label: { formatter: '현재', color: t.subtle, fontSize: 11 },
           lineStyle: { color: t.axis, type: 'dashed' }, data: [{ xAxis: form.경영비 }] } },
@@ -169,9 +170,11 @@ const distOption = computed(() => {
     yAxis: axisY({ name: '단위면적당 ROI (%)', axisLabel: { color: t.subtle, fontSize: 11.5,
       formatter: '{value}%' } }),
     series: [
-      { type: 'boxplot', data: rows.map((r) => r.box), boxWidth: [18, 46],
-        itemStyle: { color: 'rgba(46,125,79,.22)', borderColor: palette.forest, borderWidth: 1.6 },
-        emphasis: { itemStyle: { color: 'rgba(46,125,79,.35)' } } },
+      { type: 'boxplot', data: rows.map((r) => r.box), boxWidth: [20, 50],
+        itemStyle: { color: 'rgba(46,125,79,.2)', borderColor: palette.forest,
+          borderWidth: 2, shadowColor: 'rgba(46,125,79,.18)', shadowBlur: 6 },
+        emphasis: { itemStyle: { color: 'rgba(46,125,79,.34)', borderWidth: 2.6 } },
+        animationDuration: 700 },
       { type: 'line', symbol: 'none', silent: true, tooltip: { show: false },
         data: rows.map(() => res.value?.roi ?? null),
         lineStyle: { color: palette.amber, type: 'dashed', width: 2 } },

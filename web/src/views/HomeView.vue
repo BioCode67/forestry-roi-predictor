@@ -15,7 +15,7 @@ import EChart from '../components/EChart.vue'
 import DataState from '../components/DataState.vue'
 import { api, fmt } from '../lib/api'
 import { SCALE_HINT, SECTOR_EASY } from '../lib/terms'
-import { axisX, axisY, baseOption, palette, theme } from '../lib/charts'
+import { areaGrad, axisX, axisY, baseOption, palette, theme, tip } from '../lib/charts'
 
 const meta = inject('meta')
 const farm = inject('farm')
@@ -276,9 +276,9 @@ const curveOption = computed(() => {
     series: [{
       type: 'line', smooth: 0.25, symbol: 'none',
       data: c.map((p) => [p.cost, p.income]),
-      lineStyle: { width: 3, color: palette.forest },
-      areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [
-        { offset: 0, color: 'rgba(46,125,79,.2)' }, { offset: 1, color: 'rgba(46,125,79,0)' }] } },
+      lineStyle: { width: 3.4, color: palette.forest,
+        shadowColor: 'rgba(46,125,79,.28)', shadowBlur: 12, shadowOffsetY: 4 },
+      areaStyle: { color: areaGrad(palette.forest, 0.2) },
       markPoint: {
         symbol: 'pin', symbolSize: 46, itemStyle: { color: palette.amber },
         label: { fontSize: 10, color: '#fff', fontWeight: 700, formatter: '최대' },
@@ -311,7 +311,7 @@ const COST_PRESETS = [300, 700, 1500, 3000, 6000]
       lead="네 가지만 고르시면 전국 임가를 조사한 자료로 계산한 예상 금액을 알려드립니다. 얼마를 쓰면 얼마가 남는지, 언제 어디에 팔면 값을 더 받는지까지 함께 봅니다."
     />
 
-    <!-- 화면을 내리면 통계가 하나씩 드러난다 -->
+    <!-- 화면을 내리면 통계가 하나씩 드러납니다 -->
     <StatPanel v-for="(p, i) in panels" :key="i" v-bind="p" />
 
     <div class="calc-lead">
