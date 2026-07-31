@@ -86,6 +86,15 @@ def load_cost_data():
 
 
 @st.cache_data(show_spinner=False)
+def load_production():
+    p = os.path.join(MODEL_DIR, "production_insights.json")
+    if not os.path.exists(p):
+        return None
+    with open(p, encoding="utf-8") as f:
+        return json.load(f)
+
+
+@st.cache_data(show_spinner=False)
 def load_insights():
     p = os.path.join(MODEL_DIR, "insights.json")
     if not os.path.exists(p):
@@ -237,9 +246,9 @@ if np.isfinite(base_roi):
             f"차이는 **{gap:+,.0f}원**입니다."
         )
 
-tab1, tab5, tab6, tab2, tab3, tab4 = st.tabs(
+tab1, tab5, tab6, tab7, tab2, tab3, tab4 = st.tabs(
     ["📈 예측 & 경영 진단", "🌰 품목별 정밀 진단", "💡 수익 개선 인사이트",
-     "🚚 최적 출하시기", "🏆 모델 성능 비교", "📊 데이터·방법론"]
+     "📦 임산물 시장·단가", "🚚 최적 출하시기", "🏆 모델 성능 비교", "📊 데이터·방법론"]
 )
 
 # ---------------------------------------------------------------------------
@@ -672,6 +681,119 @@ with tab6:
                                    "ROI 중앙값(%)": v["ROI"]} for k, v in best.items()]),
                     width="stretch", hide_index=True)
             st.caption("표본 15건 이상인 조합만 표시합니다.")
+
+
+# ---------------------------------------------------------------------------
+# TAB 7 — 임산물 시장·단가 (임산물생산조사)
+# ---------------------------------------------------------------------------
+prod = load_production()
+
+with tab7:
+    if prod is None:
+        st.info("`python src/production.py` 를 실행하면 시장·단가 분석이 생성됩니다.")
+    else:
+        yrs = prod["연도"]
+        st.caption(
+            f"산림청 국가승인통계 **「임산물생산조사」** 전품목 "
+            f"({yrs[0]}~{yrs[-1]}, {prod['관측']:,}개 시군구-품목 관측). "
+            "KAMIS가 다루지 않는 밤·대추·떫은감·표고·산나물의 **실측 단가**를 "
+            "임업통계만으로 확보합니다. 단, 연 단위 조사이므로 월별 계절성은 산출되지 않습니다."
+        )
+
+        trends = prod["단가추이"]
+        prem = prod["지역단가프리미엄"]
+        spec = prod["지역특화도_LQ"]
+
+        avail = [k for k in trends if k in prem]
+        default = "밤" if "밤" in avail else (avail[0] if avail else None)
+        psel = st.selectbox("품목", sorted(avail), index=sorted(avail).index(default)
+                            if default else 0, key="prod_item")
+
+        if psel:
+            t = trends[psel]
+            last = t["연도별"][-1]
+            k1, k2, k3, k4 = st.columns(4)
+            k1.metric(f"{last['연도']}년 전국 단가", f"{last['가중평균단가']:,.0f} 원/kg",
+                      delta=f"{t['단가_변화율_pct']:+.1f}% ({yrs[0]}년 대비)")
+            k2.metric("생산량 변화", f"{t['생산량_변화율_pct']:+.1f} %",
+                      delta_color="off")
+            k3.metric("시장 규모", f"{last['생산금액'] / 1e8:,.0f} 억원")
+            k4.metric("생산 시군구", f"{last['시군구수']:,} 곳")
+
+            pc1, pc2 = st.columns(2)
+            with pc1:
+                st.subheader("단가·생산량 추이")
+                d = pd.DataFrame(t["연도별"])
+                f = make_subplots(specs=[[{"secondary_y": True}]])
+                f.add_trace(go.Scatter(x=d["연도"], y=d["가중평균단가"], name="단가 (원/kg)",
+                                       line=dict(color=GREEN, width=3),
+                                       mode="lines+markers"), secondary_y=False)
+                f.add_trace(go.Bar(x=d["연도"], y=d["생산량"] / 1e3, name="생산량 (톤)",
+                                   marker_color=GREY, opacity=0.55), secondary_y=True)
+                f.update_xaxes(title="연도", tickmode="linear", dtick=1)
+                f.update_yaxes(title="물량가중 단가 (원/kg)", secondary_y=False)
+                f.update_yaxes(title="생산량 (톤)", secondary_y=True)
+                f.update_layout(height=350, margin=dict(l=10, r=10, t=20, b=10),
+                                legend=dict(orientation="h", y=1.15))
+                st.plotly_chart(f, width="stretch")
+
+            with pc2:
+                st.subheader(f"시도별 단가 프리미엄 ({prem[psel]['연도']}년)")
+                rows = prem[psel]["지역"]
+                d2 = pd.DataFrame(rows)
+                f2 = go.Figure(go.Bar(
+                    x=d2["전국대비_pct"], y=d2["시도"], orientation="h",
+                    marker_color=[GREEN if v >= 0 else "#C62828" for v in d2["전국대비_pct"]],
+                    text=[f"{v:+.0f}%" for v in d2["전국대비_pct"]], textposition="outside"))
+                f2.update_layout(height=350, margin=dict(l=10, r=10, t=20, b=10),
+                                 xaxis_title=f"전국 평균({prem[psel]['전국_가중평균단가']:,.0f}원) 대비 (%)",
+                                 yaxis=dict(autorange="reversed"))
+                st.plotly_chart(f2, width="stretch")
+
+            gap = prem[psel]
+            st.info(
+                f"**{psel} 지역 단가 격차 {gap['지역격차_배']}배** — "
+                f"최고 {gap['최고지역']} {gap['최고단가']:,.0f}원 vs "
+                f"최저 {gap['최저지역']} {gap['최저단가']:,.0f}원. "
+                "동일 품목이라도 산지에 따라 수취 단가가 크게 다르므로, "
+                "품종·등급·출하처 구성을 점검할 근거가 됩니다."
+            )
+
+            if psel in spec:
+                st.subheader("주산지 특화도 (LQ)")
+                st.caption("LQ = 지역 내 해당 품목 생산금액 비중 ÷ 전국 비중. "
+                           "1보다 크면 그 지역이 해당 품목에 특화되어 있다는 뜻입니다.")
+                st.dataframe(
+                    pd.DataFrame(spec[psel]["상위지역"]).rename(columns={
+                        "전국비중_pct": "전국 생산금액 중 비중(%)", "생산금액": "생산금액(원)"}),
+                    width="stretch", hide_index=True)
+
+        st.markdown("---")
+        st.subheader("전 품목 단가 변화 한눈에 보기")
+        fp = os.path.join(FIG_DIR, "prod_price_trend.png")
+        if os.path.exists(fp):
+            st.image(fp, width="stretch")
+
+        proc = prod.get("가공부가가치", {})
+        if proc:
+            st.subheader("1차 가공의 경제성")
+            for k, v in proc.items():
+                verdict_ok = v["판정"] == "가공이 유리"
+                box = st.success if verdict_ok else st.warning
+                box(
+                    f"**{k} — {v['판정']}**\n\n"
+                    f"{v['해석']}\n\n"
+                    f"원물 1kg을 가공해 얻는 수취액은 **{v['원물1kg당_가공수취액']:,.0f}원**으로, "
+                    f"원물 직판({v['원물_단가']:,.0f}원) 대비 **{v['원물직판대비_pct']:+.1f}%** 입니다."
+                )
+                st.caption(v["주의"])
+
+        with st.expander("분석 전제 및 데이터 처리"):
+            st.markdown(f"- {prod['주의']}")
+            st.markdown(
+                "- 단가는 관측치 단순평균이 아니라 **생산금액 ÷ 생산량**(물량가중)으로 계산했습니다. "
+                "소규모 시군구의 특이 단가가 전국 평균을 왜곡하지 않도록 하기 위함입니다."
+            )
 
 
 # ---------------------------------------------------------------------------
