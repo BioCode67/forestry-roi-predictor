@@ -7,7 +7,8 @@
 import { computed, inject, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Answer from '../components/Answer.vue'
-import Hero from '../components/Hero.vue'
+import PhotoHero from '../components/PhotoHero.vue'
+import StatPanel from '../components/StatPanel.vue'
 import TipList from '../components/TipList.vue'
 import Term from '../components/Term.vue'
 import EChart from '../components/EChart.vue'
@@ -42,6 +43,66 @@ watch(farm, () => {
 }, { deep: true, immediate: true })
 
 api.management().then((d) => { mgmt.value = d }).catch(() => {})
+
+/* 스크롤 패널에 얹을 수치 — 전부 실제 분석 산출물에서 가져온다 */
+const prod = ref(null)
+const ins = ref(null)
+api.production().then((d) => { prod.value = d }).catch(() => {})
+api.insights().then((d) => { ins.value = d }).catch(() => {})
+
+const panels = computed(() => {
+  const out = []
+  const bench = meta.value?.benchmark_a
+  if (bench?.improvement) {
+    out.push({
+      src: '/img/ridge.jpg', align: 'left',
+      kicker: '왜 필요한가', value: fmt.dec(bench.improvement.R2_ratio ?? 0, 1), unit: '배',
+      title: '평균값으로는 내 산을 알 수 없습니다',
+      body: '지금까지 통계는 "밤 농사 평균 소득 ○○만원" 같은 평균값만 알려줬습니다. '
+        + '그런데 같은 작목·같은 지역이어도 농가마다 성과가 크게 갈립니다. '
+        + '전국 임가를 한 곳 한 곳 학습한 이 계산기는 기존 평균 방식보다 '
+        + `${fmt.dec(bench.improvement.R2_ratio ?? 0, 1)}배 정확하게 맞힙니다.`,
+      source: '임가경제조사 마이크로데이터 2019~2023 · 4,438 임가',
+    })
+  }
+  const mm = mgmt.value?.품목별?.밤?.출하시기별_단가
+  if (mm) {
+    out.push({
+      src: '/img/harvest.jpg', align: 'right',
+      kicker: '언제 파는가', value: fmt.dec(mm.격차_배, 2), unit: '배',
+      title: `같은 밤인데 ${mm.최고시기}과 ${mm.최저시기}의 값이 다릅니다`,
+      body: `${mm.최고시기}에 팔면 kg당 ${fmt.int(mm.최고단가)}원, `
+        + `${mm.최저시기}에 팔면 ${fmt.int(mm.최저단가)}원입니다. `
+        + `그런데 정작 농가의 ${fmt.dec(mm.평균구성비_pct[mm.최저시기] ?? 0, 0)}%가 값이 가장 낮은 때에 내놓습니다.`,
+      source: '임업경영실태조사 2020 · 출하시기 구성비 회귀 추정',
+    })
+  }
+  const g = ins.value?.등급별_단가?.밤
+  if (g?.최고_최저_단가배수) {
+    const top = g.등급[0], bot = g.등급[g.등급.length - 1]
+    out.push({
+      src: '/img/canopy.jpg', align: 'left',
+      kicker: '어떻게 파는가', value: fmt.dec(g.최고_최저_단가배수, 1), unit: '배',
+      title: '등급 하나 차이가 값을 이만큼 바꿉니다',
+      body: `${top.구분} 등급은 kg당 ${fmt.int(top.단가_원per단위수량)}원, `
+        + `${bot.구분} 등급은 ${fmt.int(bot.단가_원per단위수량)}원입니다. `
+        + '선별과 전정을 손보는 것만으로 수취액이 달라집니다.',
+      source: '임산물생산비조사 · 등급별 실측 단가',
+    })
+  }
+  const pr = prod.value?.지역단가프리미엄?.밤
+  if (pr) {
+    out.push({
+      src: '/img/path.jpg', align: 'right',
+      kicker: '어디서 파는가', value: fmt.dec(pr.지역격차_배, 2), unit: '배',
+      title: '같은 작물도 산지에 따라 받는 값이 다릅니다',
+      body: `${pr.최고지역} ${fmt.int(pr.최고단가)}원, ${pr.최저지역} ${fmt.int(pr.최저단가)}원. `
+        + '품종과 등급 구성, 파는 곳이 달라서 생기는 차이입니다. 내 지역 값이 어디쯤인지 확인해 보세요.',
+      source: `임산물생산조사 ${pr.연도} · 전국 시군구 실측`,
+    })
+  }
+  return out
+})
 
 const opts = (key) => {
   const d = meta.value?.codebook?.[key]
@@ -243,11 +304,23 @@ const COST_PRESETS = [300, 700, 1500, 3000, 6000]
 
 <template>
   <div>
-    <Hero
+    <PhotoHero
+      src="/img/hero.jpg"
       eyebrow="산림청 국가승인통계 · 전국 임가 조사"
       title="내 산에서 한 해에 얼마나 남을까요?"
       lead="네 가지만 고르시면 전국 임가를 조사한 자료로 계산한 예상 금액을 알려드립니다. 얼마를 쓰면 얼마가 남는지, 언제 어디에 팔면 값을 더 받는지까지 함께 봅니다."
     />
+
+    <!-- 화면을 내리면 통계가 하나씩 드러난다 -->
+    <StatPanel v-for="(p, i) in panels" :key="i" v-bind="p" />
+
+    <div class="calc-lead">
+      <div class="calc-lead__inner">
+        <p class="calc-lead__kicker">이제 내 차례</p>
+        <h2 class="calc-lead__title">그럼 내 산은 얼마나 남을까요?</h2>
+        <p class="calc-lead__desc">네 가지만 고르시면 바로 계산해 드립니다.</p>
+      </div>
+    </div>
 
   <main class="content" style="padding-top:0">
     <div class="container" style="max-width:1080px">
@@ -417,12 +490,22 @@ const COST_PRESETS = [300, 700, 1500, 3000, 6000]
 
 <style scoped>
 .card--float {
-  margin-top: -44px;
+  margin-top: 0;
   margin-bottom: 26px;
   box-shadow: var(--shadow-lg);
   border-color: transparent;
 }
-@media (max-width: 820px) { .card--float { margin-top: -30px; } }
+
+
+.calc-lead { padding: 74px 32px 30px; text-align: center; }
+.calc-lead__inner { max-width: 62ch; margin: 0 auto; }
+.calc-lead__kicker {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.2em;
+  text-transform: uppercase; color: var(--forest-600); margin-bottom: 12px;
+}
+.calc-lead__title { font-size: clamp(1.6rem, 3.4vw, 2.5rem); letter-spacing: -0.035em; }
+.calc-lead__desc { margin-top: 10px; color: var(--text-muted); }
+@media (max-width: 820px) { .calc-lead { padding: 50px 18px 22px; } }
 
 .linkcard {
   display: flex; flex-direction: column; gap: 4px;
