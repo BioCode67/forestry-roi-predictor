@@ -8,3 +8,7 @@ venv/
 
 # 전처리 산출물 (재생성 가능)
 data/processed_forestry_data.csv
+
+# 프런트엔드
+web/node_modules/
+web/dist/

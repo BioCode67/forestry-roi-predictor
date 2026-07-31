@@ -1,0 +1,305 @@
+"""모델 로딩과 예측 로직. FastAPI 라우트에서 얇게 호출한다."""
+from __future__ import annotations
+
+import json
+import math
+import os
+import sys
+from functools import lru_cache
+
+import numpy as np
+import pandas as pd
+import xgboost as xgb
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "src"))
+
+from preprocess import CATEGORICALS, FALLBACK_CODEBOOK, add_derived_features, parse_codebook  # noqa: E402
+from preprocess_cost import CODEBOOK as COST_CODEBOOK  # noqa: E402
+from preprocess_cost import add_derived_cost_features  # noqa: E402
+from shipping import load_kamis, recommend  # noqa: E402
+
+MODEL_DIR = os.path.join(ROOT, "models")
+DATA_DIR = os.path.join(ROOT, "data")
+
+
+# ---------------------------------------------------------------------------
+# 로딩 (프로세스 수명 동안 1회)
+# ---------------------------------------------------------------------------
+def _sanitize(o):
+    """NaN·Inf를 None으로 바꾼다. 둘 다 유효한 JSON 값이 아니라 응답 직렬화에서 터진다."""
+    if isinstance(o, dict):
+        return {k: _sanitize(v) for k, v in o.items()}
+    if isinstance(o, list):
+        return [_sanitize(v) for v in o]
+    if isinstance(o, float) and not math.isfinite(o):
+        return None
+    return o
+
+
+def _json(path: str):
+    p = os.path.join(MODEL_DIR, path)
+    if not os.path.exists(p):
+        return None
+    with open(p, encoding="utf-8") as f:
+        return _sanitize(json.load(f))
+
+
+def _booster(name: str) -> xgb.Booster | None:
+    p = os.path.join(MODEL_DIR, name)
+    if not os.path.exists(p):
+        return None
+    b = xgb.Booster()
+    b.load_model(p)
+    b.set_param({"device": "cpu"})   # 서빙은 CPU로 충분하다
+    return b
+
+
+@lru_cache(maxsize=1)
+def registry() -> dict:
+    """모든 산출물을 한 번에 적재해 캐시한다."""
+    reg = {
+        "model_a": _booster("best_xgboost_roi.json"),
+        "schema_a": _json("feature_schema.json"),
+        "metrics_a": _json("metrics_summary.json"),
+        "model_b": _booster("best_xgboost_cost.json"),
+        "schema_b": _json("feature_schema_cost.json"),
+        "metrics_b": _json("metrics_cost.json"),
+        "quantile_a": _booster("quantile_roi.json"),
+        "quantile_b": _booster("quantile_cost.json"),
+        "metrics_q": _json("metrics_quantile.json"),
+        "insights": _json("insights.json"),
+        "production": _json("production_insights.json"),
+        "management": _json("management_insights.json"),
+        "subsidy": _json("subsidy_programs.json"),
+        "sector_profile": _json("sector_profile.json"),
+        "item_profile": _json("item_cost_profile.json"),
+    }
+    try:
+        reg["codebook"] = parse_codebook()
+    except Exception:  # noqa: BLE001
+        reg["codebook"] = dict(FALLBACK_CODEBOOK)
+    reg["cost_codebook"] = COST_CODEBOOK
+
+    p = os.path.join(DATA_DIR, "processed_forestry_data.parquet")
+    reg["df_a"] = pd.read_parquet(p) if os.path.exists(p) else None
+    p = os.path.join(DATA_DIR, "processed_cost_data.parquet")
+    reg["df_b"] = pd.read_parquet(p) if os.path.exists(p) else None
+    try:
+        reg["kamis"] = load_kamis()
+    except Exception:  # noqa: BLE001
+        reg["kamis"] = None
+    return reg
+
+
+def inv_transform(z, kind: str):
+    return np.sign(z) * np.expm1(np.abs(z)) if kind == "signed_log" else z
+
+
+# ---------------------------------------------------------------------------
+# Model A — 임가 단위
+# ---------------------------------------------------------------------------
+def build_row_a(vals: dict, schema: dict) -> pd.DataFrame:
+    row = add_derived_features(pd.DataFrame([vals]))
+    X = row.reindex(columns=schema["features"])
+    for c in schema["categorical"]:
+        X[c] = pd.Categorical(
+            X[c].astype("Int64").fillna(-1).to_numpy(dtype="int64"),
+            categories=schema["categories"][c])
+    for c in schema["numeric"]:
+        X[c] = pd.to_numeric(X[c], errors="coerce").astype("float64")
+    return X.replace([np.inf, -np.inf], np.nan)
+
+
+def predict_a(vals: dict) -> dict:
+    reg = registry()
+    if reg["model_a"] is None:
+        raise RuntimeError("Model A가 학습되지 않았습니다.")
+    schema = reg["schema_a"]
+    X = build_row_a(vals, schema)
+    kind = schema.get("target_transform", "none")
+    roi = float(inv_transform(
+        reg["model_a"].predict(xgb.DMatrix(X, enable_categorical=True))[0], kind))
+
+    band = None
+    if reg["quantile_a"] is not None:
+        pred = reg["quantile_a"].predict(xgb.DMatrix(X, enable_categorical=True))
+        pred = np.sort(np.atleast_2d(pred), axis=1)[0]
+        band = [float(inv_transform(v, "none")) for v in pred]
+
+    cost = float(vals.get("임업경영비") or 0)
+    baseline = _baseline_a(vals)
+    return {
+        "roi": roi,
+        "band": band,
+        "coverage": (reg["metrics_q"] or {}).get("roi", {}).get("coverage_80pct"),
+        "income": roi / 100.0 * cost,
+        "revenue": cost + roi / 100.0 * cost,
+        "cost": cost,
+        "baseline_roi": baseline,
+        "baseline_income": None if baseline is None else baseline / 100.0 * cost,
+    }
+
+
+def _baseline_a(vals: dict) -> float | None:
+    """산림청 현행 방식 — 지역별x업종별 단순 평균."""
+    df = registry()["df_a"]
+    if df is None:
+        return None
+    g = df[(df["지역별"] == vals["지역별"]) & (df["업종별"] == vals["업종별"])]["ROI"]
+    if len(g) < 5:
+        g = df[df["업종별"] == vals["업종별"]]["ROI"]
+    return float(g.mean()) if len(g) else float(df["ROI"].mean())
+
+
+def response_curve_a(vals: dict, lo_mult=0.2, hi_mult=2.5, n=36) -> list[dict]:
+    base = float(vals.get("임업경영비") or 0)
+    if base <= 0:
+        return []
+    grid = np.unique(np.clip(
+        np.concatenate([np.linspace(max(base * lo_mult, 1e6), base * hi_mult, n), [base]]),
+        1e5, 5e8))
+    reg = registry()
+    schema = reg["schema_a"]
+    kind = schema.get("target_transform", "none")
+    rows = []
+    frames = [build_row_a(dict(vals, 임업경영비=float(c)), schema) for c in grid]
+    X = pd.concat(frames, ignore_index=True)
+    for c in schema["categorical"]:
+        X[c] = pd.Categorical(X[c].astype("int64"), categories=schema["categories"][c])
+    preds = inv_transform(
+        reg["model_a"].predict(xgb.DMatrix(X, enable_categorical=True)), kind)
+    for c, r in zip(grid, preds):
+        rows.append({"cost": float(c), "roi": float(r), "income": float(r) / 100 * float(c)})
+    return rows
+
+
+def sector_simulation(vals: dict) -> list[dict]:
+    reg = registry()
+    out = []
+    for code, label in reg["codebook"]["업종별"].items():
+        r = predict_a(dict(vals, 업종별=int(code)))
+        out.append({"sector": label, "roi": r["roi"]})
+    return sorted(out, key=lambda x: -x["roi"])
+
+
+def peer_distribution(sector_code: int, bins: int = 36) -> dict:
+    df = registry()["df_a"]
+    if df is None:
+        return {}
+    peer = df[df["업종별"] == sector_code]["ROI"]
+    if peer.empty:
+        return {}
+    counts, edges = np.histogram(peer, bins=bins)
+    return {
+        "n": int(len(peer)),
+        "bins": [float((edges[i] + edges[i + 1]) / 2) for i in range(len(counts))],
+        "counts": [int(c) for c in counts],
+        "values": [float(v) for v in peer.to_numpy()],
+    }
+
+
+def percentile_in_peer(sector_code: int, roi: float) -> float | None:
+    df = registry()["df_a"]
+    if df is None:
+        return None
+    peer = df[df["업종별"] == sector_code]["ROI"]
+    return float((peer < roi).mean() * 100) if len(peer) else None
+
+
+# ---------------------------------------------------------------------------
+# Model B — 품목 단위
+# ---------------------------------------------------------------------------
+def build_row_b(item: str, overrides: dict, schema: dict) -> pd.DataFrame:
+    base = {k: (np.nan if v is None else v)
+            for k, v in schema["item_medians"].get(item, schema["train_medians"]).items()}
+    base.update(overrides)
+    base["품목"] = item
+    row = add_derived_cost_features(pd.DataFrame([base]))
+    X = row.reindex(columns=schema["features"])
+    for c in schema["categorical"]:
+        v = schema["item_map"].get(item, -1) if c == "품목" else X[c].iloc[0]
+        X[c] = pd.Categorical(
+            pd.Series([v]).astype("Int64").fillna(-1).to_numpy(dtype="int64"),
+            categories=schema["categories"][c])
+    for c in schema["numeric"]:
+        X[c] = pd.to_numeric(X[c], errors="coerce").astype("float64")
+    return X.replace([np.inf, -np.inf], np.nan)
+
+
+def predict_b(item: str, overrides: dict) -> dict:
+    reg = registry()
+    if reg["model_b"] is None:
+        raise RuntimeError("Model B가 학습되지 않았습니다.")
+    schema = reg["schema_b"]
+    X = build_row_b(item, overrides, schema)
+    kind = schema.get("target_transform", "none")
+    roi = float(inv_transform(
+        reg["model_b"].predict(xgb.DMatrix(X, enable_categorical=True))[0], kind))
+    cost = float(overrides.get("경영비") or 0)
+
+    df = reg["df_b"]
+    peer_med = lead_med = None
+    if df is not None:
+        p = df[df["품목"] == item]
+        if len(p):
+            peer_med = float(p["ROI"].median())
+            lead = p[p["경영수준별"] == 1]
+            if len(lead):
+                lead_med = float(lead["ROI"].median())
+    return {
+        "roi": roi, "income": roi / 100.0 * cost, "cost": cost,
+        "peer_median": peer_med, "leader_median": lead_med,
+        "unit": "만본" if "표고" in item else "ha",
+    }
+
+
+def cost_structure(item: str, overrides: dict) -> dict:
+    """귀 임가 비목 구성 vs 선도임가 중앙값."""
+    reg = registry()
+    schema, df = reg["schema_b"], reg["df_b"]
+    if schema is None or df is None:
+        return {}
+    ratios = ["노동비_비중", "비료비_비중", "농약비_비중", "감가상각비_비중", "위탁영농비_비중"]
+    labels = ["노동비", "비료비", "농약비", "감가상각비", "위탁영농비"]
+    X = build_row_b(item, overrides, schema)
+    lead = df[(df["품목"] == item) & (df["경영수준별"] == 1)]
+    out = []
+    for lab, col in zip(labels, ratios):
+        mine = float(X[col].iloc[0]) * 100 if col in X.columns and pd.notna(X[col].iloc[0]) else None
+        theirs = float(lead[col].median()) * 100 if col in lead.columns and len(lead) else None
+        out.append({"item": lab, "mine": mine, "leader": theirs,
+                    "gap": None if (mine is None or theirs is None) else mine - theirs})
+    return {"rows": out, "leader_n": int(len(lead))}
+
+
+def item_roi_distribution() -> list[dict]:
+    df = registry()["df_b"]
+    if df is None:
+        return []
+    return [{"item": it, "values": [float(v) for v in g["ROI"].to_numpy()],
+             "median": float(g["ROI"].median()), "n": int(len(g))}
+            for it, g in df.groupby("품목", observed=True)]
+
+
+def response_curve_b(item: str, overrides: dict, n=30) -> list[dict]:
+    base = float(overrides.get("경영비") or 0)
+    if base <= 0:
+        return []
+    reg = registry()
+    schema = reg["schema_b"]
+    kind = schema.get("target_transform", "none")
+    grid = np.linspace(max(base * 0.3, 1e5), base * 2.0, n)
+    rows = []
+    for c in grid:
+        X = build_row_b(item, dict(overrides, 경영비=float(c)), schema)
+        r = float(inv_transform(
+            reg["model_b"].predict(xgb.DMatrix(X, enable_categorical=True))[0], kind))
+        rows.append({"cost": float(c), "roi": r, "income": r / 100 * float(c)})
+    return rows
+
+
+# ---------------------------------------------------------------------------
+def shipping_for(sector_label: str) -> dict:
+    reg = registry()
+    return recommend(sector_label, reg["kamis"])

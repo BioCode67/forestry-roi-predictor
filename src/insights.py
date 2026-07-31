@@ -436,7 +436,10 @@ def region_matrix(raw: pd.DataFrame) -> tuple[dict, str]:
 
     best = {c: {"지역": str(piv[c].idxmax()), "ROI": round(float(piv[c].max()), 1)}
             for c in piv.columns if piv[c].notna().any()}
-    return {"matrix": piv.round(1).to_dict(), "품목별_최적지역": best}, p
+    # 표본 미달 조합은 NaN인데, NaN은 유효한 JSON이 아니므로 null로 바꾼다.
+    matrix = {c: {r: (None if pd.isna(v) else round(float(v), 1))
+                  for r, v in piv[c].items()} for c in piv.columns}
+    return {"matrix": matrix, "품목별_최적지역": best}, p
 
 
 # ---------------------------------------------------------------------------
