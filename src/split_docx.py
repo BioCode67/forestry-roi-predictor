@@ -59,15 +59,20 @@ def plan(src: str):
     return marks, titles
 
 
-def carve(src: str, dst: str, keep: str, marks) -> None:
-    """원본을 복사한 뒤 다른 절의 요소만 지웁니다."""
+def carve(src: str, dst: str, keep, marks) -> None:
+    """원본을 복사한 뒤 남길 절 밖의 요소만 지웁니다.
+
+    keep은 절 번호 하나 또는 여럿입니다. 여럿이면 그 절들이 원래 순서대로
+    한 문서에 이어집니다.
+    """
+    keep = {keep} if isinstance(keep, str) else set(keep)
     shutil.copy2(src, dst)
     doc = Document(dst)
     body = doc.element.body
     # sectPr(용지 설정)은 본문 마지막에 있어야 하므로 건드리지 않습니다
     children = [el for el in body if el.tag != qn("w:sectPr")]
     for el, mark in zip(children, marks):
-        if mark != keep:
+        if mark not in keep:
             body.remove(el)
     doc.save(dst)
 
@@ -79,6 +84,23 @@ def main() -> None:
         os.remove(os.path.join(OUTDIR, f))
 
     made = []
+
+    # 한 번에 붙여넣을 묶음 판본. 절을 하나씩 옮기는 것보다 이쪽이 손이 덜 갑니다.
+    # 표지는 붙임3 양식에 들어가지 않으므로 뺍니다.
+    for name, keep, why in [
+        ("붙임3_남은부분_2에서5까지.docx", ["2", "3", "4", "5"],
+         "1)절을 이미 넣으셨다면 이 파일 하나면 됩니다"),
+        ("붙임3_본문전체_1에서5까지.docx", ["1", "2", "3", "4", "5"],
+         "처음부터 다시 넣으실 때"),
+    ]:
+        dst = os.path.join(OUTDIR, name)
+        carve(SRC, dst, keep, marks)
+        d = Document(dst)
+        made.append((name, len(d.tables), len(d.inline_shapes), os.path.getsize(dst)))
+        print(f"  {name:40s} 표 {len(d.tables):2d}개 · 그림 {len(d.inline_shapes):2d}장 · "
+              f"{os.path.getsize(dst)/1e6:.1f}MB   ← {why}")
+    print()
+
     for num in ["0", "1", "2", "3", "4", "5"]:
         if num not in titles:
             continue
@@ -93,8 +115,12 @@ def main() -> None:
               f"{os.path.getsize(dst)/1e6:.1f}MB")
 
     guide = (
-        "제출본 절별 파일 — 팀 임과 함께\n\n"
-        "한컴독스에 이미 써 넣으신 부분이 있을 때를 위해 절마다 따로 나눴습니다.\n\n"
+        "제출본 파일 — 팀 임과 함께\n\n"
+        "★ 가장 빠른 길\n"
+        "  1)절까지 넣으셨다면 [붙임3_남은부분_2에서5까지.docx] 하나만 여시면 됩니다.\n"
+        "  Ctrl+A → Ctrl+C → 신청서의 2) 자리에 Ctrl+V. 표·그림·글이 한 번에 옵니다.\n"
+        "  붙임1 칸은 [붙임1_신청서문구.docx]를 따로 쓰십시오.\n\n"
+        "절을 하나씩 옮기고 싶으시면 번호가 붙은 파일들을 쓰시면 됩니다.\n\n"
         "쓰는 법\n"
         "  1. 필요한 절의 .docx를 한컴독스에서 엽니다\n"
         "  2. Ctrl+A 로 전체 선택, Ctrl+C\n"
