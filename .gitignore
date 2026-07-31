@@ -29,3 +29,7 @@ data/임산물생산비조사/
 data/임산물생산조사/
 data/임업경영실태조사/
 data/총괄_*/
+# 전처리 산출물도 임가 단위 행자료입니다. 서비스는 집계값(models/serving_stats.json)을
+# 쓰므로 이 파일들이 없어도 돌아갑니다.
+data/processed_*.parquet
+data/processed_*meta.json

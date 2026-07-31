@@ -45,15 +45,12 @@ const regionLabel = computed(() => meta.value?.codebook?.지역별?.[farm.지역
 
 /** 같은 업종 임가의 분포 요약 — 내 위치를 숫자로 함께 보여준다 */
 const peerStat = computed(() => {
-  const v = res.value?.peer?.values
-  if (!v?.length) return null
-  const s = [...v].sort((a, b) => a - b)
-  const q = (p) => {
-    const i = (s.length - 1) * p
-    const lo = Math.floor(i), hi = Math.ceil(i)
-    return s[lo] + (s[hi] - s[lo]) * (i - lo)
-  }
-  return { median: q(0.5), q1: q(0.25), q3: q(0.75) }
+  // 서버가 개별 임가 값 대신 분위수 격자(0·2·4…100%)를 내려준다.
+  // 임가 하나하나의 수익을 밖으로 내보내지 않기 위해서다.
+  const q = res.value?.peer?.quantiles
+  if (!q?.length) return null
+  const at = (p) => q[Math.round(p * (q.length - 1))]
+  return { median: at(0.5), q1: at(0.25), q3: at(0.75) }
 })
 
 const rank = computed(() => {

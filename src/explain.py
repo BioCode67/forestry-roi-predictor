@@ -314,3 +314,66 @@ def neighbors(df: pd.DataFrame, vals: dict, k: int = 40, top: int = 8) -> dict:
         "설명": "지역·작목·규모·전겸업이 비슷한 임가를 찾아, 그중 수익이 높은 쪽과 "
                 "낮은 쪽이 무엇에서 갈리는지 비교한 결과입니다. 인과가 아니라 경향입니다.",
     }
+
+
+# ── 집계값으로 하는 유사 임가 비교 ────────────────────────────────────────
+NEIGHBOR_LABEL = {
+    "임업경영비": "한 해 쓰는 돈",
+    "ha당_경영비": "면적당 쓰는 돈",
+    "경영비_자본비율": "재산 대비 투입 비율",
+    "임업외소득": "임업 말고 버는 돈",
+    "ha당_가용노동력": "면적당 일손",
+}
+CELL_WEIGHT = {"업종별": 3.0, "지역별": 2.0, "임지규모별": 1.0, "전/겸업별": 1.0}
+
+
+def neighbors_from_cells(stats: dict, vals: dict, top: int = 8) -> dict:
+    """비슷한 조건 집단을 찾아 그 안에서 무엇이 갈리는지 보여줍니다.
+
+    예전에는 개별 임가 4,438행에서 가까운 40곳을 골랐습니다. 그러려면 행자료를
+    배포본에 실어야 하는데, 임가 단위 자료를 공개 저장소에 두는 셈이라
+    미리 집단별로 묶어 둔 값을 쓰도록 바꿨습니다.
+
+    집단은 지역·작목·규모·전겸업이 같은 임가들이고, 5곳이 못 되는 집단은
+    애초에 만들어지지 않습니다. 딱 맞는 집단이 없으면 조건이 덜 어긋나는 쪽부터
+    찾아 갑니다. 작목이 다른 것은 지역이 다른 것보다 크게 칩니다.
+    """
+    keys = stats.get("cell_keys") or ["지역별", "업종별", "임지규모별", "전/겸업별"]
+    cells = stats.get("cells") or []
+    if not cells:
+        return {}
+
+    def gap(cell):
+        d = 0.0
+        for i, k in enumerate(keys):
+            want, got = vals.get(k), cell["key"][i]
+            if want is None or int(want) != int(got):
+                d += CELL_WEIGHT.get(k, 1.0)
+        return d
+
+    best = min(cells, key=lambda c: (gap(c), -c["n"]))
+    d = gap(best)
+
+    diffs = []
+    for c, label in NEIGHBOR_LABEL.items():
+        hi, lo = best["잘버는쪽"].get(c), best["그외"].get(c)
+        if hi is None or lo is None or not lo:
+            continue
+        diffs.append({"항목": label, "잘버는쪽": hi, "그외": lo,
+                      "차이_pct": round((hi / lo - 1) * 100, 1)})
+    diffs.sort(key=lambda r: -abs(r["차이_pct"]))
+
+    qs = best.get("ROI분위수") or []
+    상위 = [round(v, 1) for v in qs[-top:][::-1]] if qs else []
+
+    맞춤 = "지역·작목·규모·전겸업이 모두 같은" if d == 0 else "조건이 가장 가까운"
+    return {
+        "표본": best["n"],
+        "이웃_ROI중앙값": best["ROI중앙값"],
+        "잘버는쪽_ROI중앙값": best.get("ROI상위중앙값"),
+        "상위_ROI": 상위,
+        "차이": diffs[:4],
+        "설명": (f"{맞춤} 임가 {best['n']}곳을 묶어, 그중 수익이 높은 쪽과 낮은 쪽이 "
+                "무엇에서 갈리는지 비교한 결과입니다. 인과가 아니라 경향입니다."),
+        "정확도": "같은 조건" if d == 0 else "가까운 조건",
+    }

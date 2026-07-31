@@ -19,6 +19,7 @@ from preprocess_cost import CODEBOOK as COST_CODEBOOK  # noqa: E402
 from preprocess_cost import add_derived_cost_features  # noqa: E402
 from explain import explain as shap_explain  # noqa: E402
 from explain import neighbors as find_neighbors  # noqa: E402
+from explain import neighbors_from_cells  # noqa: E402
 from explain import prescribe as make_prescription  # noqa: E402
 from shipping import load_kamis, recommend  # noqa: E402
 
@@ -114,6 +115,7 @@ def registry() -> dict:
         "weather_region": _json("weather_region.json"),
         "portfolio": _json("portfolio.json"),
         "audit_split": _json("audit_split.json"),
+        "stats": _json("serving_stats.json"),
         "schema_panel": _json("feature_schema_panel.json"),
         "metrics_panel": _json("metrics_panel.json"),
     })
@@ -355,9 +357,29 @@ def predict_a(vals: dict) -> dict:
     }
 
 
+def _stats_a() -> dict:
+    return ((registry().get("stats") or {}).get("model_a") or {})
+
+
+def _stats_b() -> dict:
+    return ((registry().get("stats") or {}).get("model_b") or {})
+
+
 def _baseline_a(vals: dict) -> float | None:
-    """산림청 현행 방식 — 지역별x업종별 단순 평균."""
-    df = registry()["df_a"]
+    """산림청 현행 방식 — 지역별x업종별 단순 평균.
+
+    미리 뽑아 둔 집계값을 씁니다. 행자료를 배포본에 싣지 않기 위해서입니다.
+    (models/serving_stats.json — src/make_serving_stats.py가 만듭니다)
+    """
+    st = _stats_a()
+    if st:
+        key = f"{int(vals['지역별'])}x{int(vals['업종별'])}"
+        v = st.get("baseline_지역x업종", {}).get(key)
+        if v is None:
+            v = st.get("baseline_업종", {}).get(str(int(vals["업종별"])))
+        return float(v) if v is not None else st.get("baseline_전체")
+
+    df = registry()["df_a"]          # 개발 환경에 행자료가 있으면 그대로 씁니다
     if df is None:
         return None
     g = df[(df["지역별"] == vals["지역별"]) & (df["업종별"] == vals["업종별"])]["ROI"]
@@ -398,6 +420,17 @@ def sector_simulation(vals: dict) -> list[dict]:
 
 
 def peer_distribution(sector_code: int, bins: int = 36) -> dict:
+    """같은 업종 임가의 분포.
+
+    예전에는 개별 ROI 값을 그대로 내려보냈습니다. 화면이 거기서 사분위수를
+    계산했기 때문인데, 그러면 임가 하나하나의 값이 밖으로 나갑니다.
+    분위수를 미리 계산해 내려보내면 화면이 하는 일은 같고 값은 나가지 않습니다.
+    """
+    st = _stats_a().get("peer_업종", {}).get(str(int(sector_code)))
+    if st:
+        return {"n": st["n"], "bins": st.get("bins", []),
+                "counts": st.get("counts", []), "quantiles": st.get("quantiles", [])}
+
     df = registry()["df_a"]
     if df is None:
         return {}
@@ -409,11 +442,18 @@ def peer_distribution(sector_code: int, bins: int = 36) -> dict:
         "n": int(len(peer)),
         "bins": [float((edges[i] + edges[i + 1]) / 2) for i in range(len(counts))],
         "counts": [int(c) for c in counts],
-        "values": [float(v) for v in peer.to_numpy()],
+        "quantiles": [float(v) for v in np.percentile(peer, range(0, 101, 2))],
     }
 
 
 def percentile_in_peer(sector_code: int, roi: float) -> float | None:
+    """분위수 격자에서 내 값이 어디쯤인지 찾습니다."""
+    st = _stats_a().get("peer_업종", {}).get(str(int(sector_code)))
+    if st and st.get("quantiles"):
+        qs = st["quantiles"]
+        below = sum(1 for v in qs if v < roi)
+        return float(below / len(qs) * 100)
+
     df = registry()["df_a"]
     if df is None:
         return None
@@ -452,15 +492,19 @@ def predict_b(item: str, overrides: dict) -> dict:
         reg["model_b"].predict(xgb.DMatrix(X, enable_categorical=True))[0], kind))
     cost = float(overrides.get("경영비") or 0)
 
-    df = reg["df_b"]
     peer_med = lead_med = None
-    if df is not None:
-        p = df[df["품목"] == item]
-        if len(p):
-            peer_med = float(p["ROI"].median())
-            lead = p[p["경영수준별"] == 1]
-            if len(lead):
-                lead_med = float(lead["ROI"].median())
+    st = _stats_b().get("품목", {}).get(str(item))
+    if st:
+        peer_med, lead_med = st.get("ROI중앙값"), st.get("선도_ROI중앙값")
+    else:
+        df = reg["df_b"]
+        if df is not None:
+            p = df[df["품목"] == item]
+            if len(p):
+                peer_med = float(p["ROI"].median())
+                lead = p[p["경영수준별"] == 1]
+                if len(lead):
+                    lead_med = float(lead["ROI"].median())
     return {
         "roi": roi, "income": roi / 100.0 * cost, "cost": cost,
         "peer_median": peer_med, "leader_median": lead_med,
@@ -477,21 +521,39 @@ def cost_structure(item: str, overrides: dict) -> dict:
     ratios = ["노동비_비중", "비료비_비중", "농약비_비중", "감가상각비_비중", "위탁영농비_비중"]
     labels = ["노동비", "비료비", "농약비", "감가상각비", "위탁영농비"]
     X = build_row_b(item, overrides, schema)
-    lead = df[(df["품목"] == item) & (df["경영수준별"] == 1)]
+
+    st = _stats_b().get("품목", {}).get(str(item))
+    if st:
+        lead_med, lead_n = st.get("선도_비목중앙값", {}), st.get("선도_n", 0)
+    else:
+        lead = df[(df["품목"] == item) & (df["경영수준별"] == 1)] if df is not None else None
+        lead_n = int(len(lead)) if lead is not None else 0
+        lead_med = ({c: (float(lead[c].median()) if c in lead.columns and len(lead) else None)
+                     for c in ratios} if lead is not None else {})
+
     out = []
     for lab, col in zip(labels, ratios):
         mine = float(X[col].iloc[0]) * 100 if col in X.columns and pd.notna(X[col].iloc[0]) else None
-        theirs = float(lead[col].median()) * 100 if col in lead.columns and len(lead) else None
+        tv = lead_med.get(col)
+        theirs = float(tv) * 100 if tv is not None else None
         out.append({"item": lab, "mine": mine, "leader": theirs,
                     "gap": None if (mine is None or theirs is None) else mine - theirs})
-    return {"rows": out, "leader_n": int(len(lead))}
+    return {"rows": out, "leader_n": int(lead_n)}
 
 
 def item_roi_distribution() -> list[dict]:
+    """품목별 ROI 분포. 개별 값 대신 분위수를 내려보냅니다."""
+    st = _stats_b().get("품목")
+    if st:
+        return [{"item": k, "quantiles": v.get("ROI분위수", []),
+                 "median": v.get("ROI중앙값"), "n": v.get("n", 0)}
+                for k, v in st.items()]
+
     df = registry()["df_b"]
     if df is None:
         return []
-    return [{"item": it, "values": [float(v) for v in g["ROI"].to_numpy()],
+    return [{"item": it,
+             "quantiles": [float(v) for v in np.percentile(g["ROI"], range(0, 101, 2))],
              "median": float(g["ROI"].median()), "n": int(len(g))}
             for it, g in df.groupby("품목", observed=True)]
 
@@ -537,6 +599,9 @@ def prescribe_a(vals: dict, target: float | None = None) -> dict:
 
 
 def neighbors_a(vals: dict) -> dict:
+    st = _stats_a()
+    if st.get("cells"):
+        return neighbors_from_cells(st, vals)
     return find_neighbors(registry()["df_a"], vals)
 
 

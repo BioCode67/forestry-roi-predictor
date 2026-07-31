@@ -149,11 +149,13 @@ const distOption = computed(() => {
     return s[lo] + (s[hi] - s[lo]) * (i - lo)
   }
   const rows = dist.value.map((d) => {
-    const v = d.values
-    const q1 = q(v, 0.25), q3 = q(v, 0.75), iqr = q3 - q1
-    const lo = Math.max(Math.min(...v), q1 - 1.5 * iqr)
-    const hi = Math.min(Math.max(...v), q3 + 1.5 * iqr)
-    return { item: d.item, box: [lo, q1, q(v, 0.5), q3, hi], n: d.n }
+    // 서버가 분위수 격자를 준다. 개별 값을 받지 않으므로 여기서 바로 읽는다.
+    const g = d.quantiles || []
+    const at = (p) => g[Math.round(p * (g.length - 1))]
+    const q1 = at(0.25), q3 = at(0.75), iqr = q3 - q1
+    const lo = Math.max(at(0), q1 - 1.5 * iqr)
+    const hi = Math.min(at(1), q3 + 1.5 * iqr)
+    return { item: d.item, box: [lo, q1, at(0.5), q3, hi], n: d.n }
   })
   return baseOption({
     grid: { left: 8, right: 14, top: 20, bottom: 8, containLabel: true },

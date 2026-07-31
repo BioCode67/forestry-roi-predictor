@@ -37,9 +37,10 @@ RUN pip install -r requirements-deploy.txt
 
 # 무거운 것부터 넣어야 코드만 고쳤을 때 계층이 다시 안 쌓입니다.
 COPY models/ ./models/
-# 원자료 전체(40MB)는 넣지 않습니다. 서빙에 필요한 것은 전처리 산출물과
-# 코드북용 파일설계서뿐입니다.
-COPY data/processed_forestry_data.parquet data/processed_cost_data.parquet ./data/
+# 마이크로데이터는 넣지 않습니다. 원자료는 물론이고 전처리된 임가 단위 행자료도
+# 마찬가지입니다. 서비스가 필요로 하는 것은 그 행들에서 나온 통계값뿐이고,
+# 그것은 models/serving_stats.json에 집단 단위로 미리 담아 두었습니다.
+# (src/make_serving_stats.py — 5곳이 못 되는 집단은 아예 만들지 않습니다)
 COPY data/codebook/ ./data/codebook/
 # shipping.py가 읽는 KAMIS 월별 도매가(0.5MB). 빼면 출하시기 안내가
 # 수확 캘린더 기준으로만 나옵니다.
