@@ -1,0 +1,111 @@
+{
+  "dataset": {
+    "rows": 4438,
+    "train": 3550,
+    "valid": 444,
+    "test": 444,
+    "target": "ROI",
+    "target_unit": "%",
+    "features": [
+      "연령별",
+      "지역별",
+      "전/겸업별",
+      "업종별",
+      "가구원수별",
+      "임지규모별",
+      "임업경영비",
+      "임업외소득",
+      "기초_자본(순재산)",
+      "연초보유",
+      "조사연도",
+      "log_임업경영비",
+      "경영비_자본비율",
+      "지역x업종"
+    ],
+    "seed": 42
+  },
+  "forest_service_baseline": {
+    "test": {
+      "R2": 0.04284056994123975,
+      "RMSE": 192.0345873128906,
+      "MAE": 152.94907175046447
+    },
+    "valid": {
+      "R2": 0.07788862029646815,
+      "RMSE": 204.9411465110036,
+      "MAE": 158.10913272526687
+    },
+    "info": {
+      "grand_mean": 155.53751839375832
+    }
+  },
+  "linear_regression": {
+    "test": {
+      "R2": 0.12932533833444604,
+      "RMSE": 183.15351933530332,
+      "MAE": 143.77830882038606
+    },
+    "valid": {
+      "R2": 0.09962763422578746,
+      "RMSE": 202.5109678318033,
+      "MAE": 154.42679242295964
+    }
+  },
+  "optuna_xgboost": {
+    "test": {
+      "R2": 0.18524290113806052,
+      "RMSE": 177.17457178419593,
+      "MAE": 135.50557317515504
+    },
+    "valid": {
+      "R2": 0.2489125946591746,
+      "RMSE": 184.9620841609676,
+      "MAE": 141.80482455407585
+    },
+    "best_params": {
+      "objective": "reg:squarederror",
+      "eval_metric": "rmse",
+      "tree_method": "hist",
+      "device": "cuda",
+      "seed": 42,
+      "learning_rate": 0.01140530144478232,
+      "max_depth": 8,
+      "min_child_weight": 0.04682284088626274,
+      "subsample": 0.7934370082784048,
+      "colsample_bytree": 0.948136678540026,
+      "colsample_bylevel": 0.7771161366410292,
+      "reg_alpha": 2.0205385448528686e-05,
+      "reg_lambda": 3.248536538015283,
+      "gamma": 0.6723347371078366,
+      "max_cat_to_onehot": 2
+    },
+    "n_estimators": 592,
+    "n_trials": 80,
+    "optuna_best_valid_rmse": 184.96208675310285
+  },
+  "improvement_vs_baseline": {
+    "R2_delta": 0.14240233119682078,
+    "RMSE_reduction_pct": 7.738197444860587,
+    "MAE_reduction_pct": 11.404775704535428
+  },
+  "figures": {
+    "benchmark": "/workspace/forestry-roi-predictor/reports/figures/benchmark_comparison.png",
+    "importance": "/workspace/forestry-roi-predictor/reports/figures/feature_importance.png"
+  },
+  "feature_importance_gain": {
+    "log_임업경영비": 91965.0625,
+    "임업경영비": 81440.359375,
+    "업종별": 74565.5,
+    "지역x업종": 66290.359375,
+    "경영비_자본비율": 64760.70703125,
+    "지역별": 59400.5546875,
+    "전/겸업별": 59397.5546875,
+    "조사연도": 58706.6953125,
+    "연초보유": 54935.0546875,
+    "기초_자본(순재산)": 52194.82421875,
+    "임지규모별": 51168.03125,
+    "임업외소득": 50357.72265625,
+    "가구원수별": 45390.7734375,
+    "연령별": 31983.017578125
+  }
+}
