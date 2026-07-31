@@ -47,6 +47,9 @@ class FarmInput(BaseModel):
     기초자본: float = Field(400_000_000, alias="기초_자본(순재산)")
     연초보유: float = 3_000_000
     조사연도: float = 2023
+    # 작년 자료 — 있으면 패널 모델로 넘어간다
+    직전_ROI: float | None = None
+    직전_경영비: float | None = None
 
     model_config = {"populate_by_name": True}
 
@@ -58,6 +61,8 @@ class FarmInput(BaseModel):
             "임업외소득": float(self.임업외소득),
             "기초_자본(순재산)": float(self.기초자본),
             "연초보유": float(self.연초보유), "조사연도": float(self.조사연도),
+            "직전_ROI": (None if self.직전_ROI is None else float(self.직전_ROI)),
+            "직전_경영비": (None if self.직전_경영비 is None else float(self.직전_경영비)),
         }
 
 
@@ -220,6 +225,12 @@ def management():
 @app.get("/api/subsidy")
 def subsidy():
     return _need(svc.registry()["subsidy"], "subsidy")
+
+
+@app.get("/api/metrics/panel")
+def metrics_panel():
+    """패널 모델 성능 — 화면에서 근거를 밝히는 데 쓴다."""
+    return _need(svc.registry()["metrics_panel"], "metrics_panel")
 
 
 @app.get("/api/portfolio")

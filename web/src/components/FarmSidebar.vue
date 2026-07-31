@@ -29,6 +29,10 @@ const options = (key) => {
 
 const years = [2019, 2020, 2021, 2022, 2023]
 
+/** 작년 자료를 채웠는가 — 채우면 더 정확한 모델로 넘어간다 */
+const hasLast = computed(() => farm.직전_ROI !== null && farm.직전_ROI !== '')
+function clearLast() { farm.직전_ROI = null; farm.직전_경영비 = null }
+
 const totalScale = computed(() =>
   fmt.won(Number(farm.임업경영비) + Number(farm['기초_자본(순재산)'])))
 
@@ -73,6 +77,39 @@ const label = (key) => meta.value?.codebook?.[key]?.[farm[key]] ?? '—'
     </div>
 
     <div class="sidebar__group">
+      <div class="sidebar__title">
+        작년 자료 <span class="opt">넣으면 더 정확합니다</span>
+      </div>
+      <p class="field__hint" style="margin:-4px 0 10px">
+        작년에 실제로 얼마를 벌었는지 아시면 적어 주세요. 산의 상태나 판로처럼
+        조사표에 없는 사정까지 함께 반영되어, 맞히는 정도가 네 배 가까이 올라갑니다.
+      </p>
+      <div class="field">
+        <label class="field__label">작년 수익률</label>
+        <div class="input-money">
+          <input class="input" type="number" v-model.number="farm.직전_ROI"
+                 min="-100" max="800" step="10" placeholder="예: 120" />
+          <span class="input-money__unit">%</span>
+        </div>
+        <p class="field__hint">
+          작년 임업소득 ÷ 작년 임업경영비 × 100. 모르시면 비워 두셔도 됩니다.
+        </p>
+      </div>
+      <div class="field">
+        <label class="field__label">작년에 쓴 돈</label>
+        <div class="input-money">
+          <input class="input" type="number" v-model.number="farm.직전_경영비"
+                 min="0" max="500000000" step="1000000" placeholder="비우면 올해와 같게 봅니다" />
+          <span class="input-money__unit">원</span>
+        </div>
+      </div>
+      <div v-if="hasLast" class="note note--good fs-xs" style="padding:10px 13px">
+        작년 자료를 반영해 계산하고 있습니다.
+        <button class="linkbtn" @click="clearLast">지우기</button>
+      </div>
+    </div>
+
+    <div class="sidebar__group">
       <div class="sidebar__title">기준 연도</div>
       <div class="chips">
         <button v-for="y in years" :key="y" class="chip"
@@ -112,6 +149,16 @@ const label = (key) => meta.value?.codebook?.[key]?.[farm[key]] ?? '—'
 </template>
 
 <style scoped>
+.opt {
+  font-size: 0.68rem; font-weight: 600; letter-spacing: 0;
+  color: var(--forest-600); background: var(--forest-100);
+  padding: 2px 7px; border-radius: var(--r-pill); margin-left: 6px;
+  text-transform: none;
+}
+.linkbtn {
+  border: 0; background: none; padding: 0; margin-left: 6px;
+  color: inherit; font: inherit; text-decoration: underline; cursor: pointer;
+}
 .sb-foot { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--border); }
 .sb-foot__head {
   font-size: 0.7rem; font-weight: 750; letter-spacing: 0.12em;

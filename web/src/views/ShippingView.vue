@@ -65,8 +65,12 @@ const shipOption = computed(() => {
   const vals = names.map((k) => e.계열단가[k])
   const hi = vals.indexOf(Math.max(...vals))
   const ci = e.신뢰구간_90pct || {}
+  // 오차막대는 custom 시리즈라 축 범위 계산에 안 들어간다. 구간 상한을 직접
+  // 축 최댓값에 반영하지 않으면 막대 위 라벨과 오차막대 윗머리가 잘린다.
+  const top = Math.max(...vals, ...names.map((n) => (ci[n] ? ci[n][1] : 0)))
+  const yMax = Math.ceil(top * 1.14 / 500) * 500
   return baseOption({
-    grid: { left: 8, right: 14, top: 30, bottom: 8, containLabel: true },
+    grid: { left: 8, right: 14, top: 40, bottom: 8, containLabel: true },
     legend: { show: false },
     tooltip: {
       trigger: 'axis', backgroundColor: t.tooltipBg, borderColor: t.tooltipBorder,
@@ -80,7 +84,7 @@ const shipOption = computed(() => {
       },
     },
     xAxis: axisX({ data: names }),
-    yAxis: axisY({ name: 'kg당 원', axisLabel: { color: t.subtle, fontSize: 11.5,
+    yAxis: axisY({ name: 'kg당 원', max: yMax, axisLabel: { color: t.subtle, fontSize: 11.5,
       formatter: (v) => fmt.int(v) } }),
     series: [
       barV(vals, { highlight: hi, label: (p) => `${fmt.int(p.value)}원`, width: '46%' }),

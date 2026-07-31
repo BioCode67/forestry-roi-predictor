@@ -1,0 +1,10 @@
+.git
+node_modules
+web/node_modules
+web/src
+web/public
+data/raw
+data/weather
+docs/figures
+**/__pycache__
+*.ipynb

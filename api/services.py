@@ -49,8 +49,12 @@ def _json(path: str):
 
 
 def _booster(name: str) -> xgb.Booster | None:
+    # 배포본은 같은 모델을 UBJSON으로 담습니다. 내용은 같고 용량이 30% 작습니다.
     p = os.path.join(MODEL_DIR, name)
-    if not os.path.exists(p):
+    ubj = os.path.splitext(p)[0] + ".ubj"
+    if os.path.exists(ubj):
+        p = ubj
+    elif not os.path.exists(p):
         return None
     b = xgb.Booster()
     b.load_model(p)
@@ -80,6 +84,9 @@ def registry() -> dict:
         "region": _json("region_stats.json"),
         "weather_region": _json("weather_region.json"),
         "portfolio": _json("portfolio.json"),
+        "model_panel": _booster("best_xgboost_panel.json"),
+        "schema_panel": _json("feature_schema_panel.json"),
+        "metrics_panel": _json("metrics_panel.json"),
     }
     try:
         reg["codebook"] = parse_codebook()
@@ -117,15 +124,59 @@ def build_row_a(vals: dict, schema: dict) -> pd.DataFrame:
     return X.replace([np.inf, -np.inf], np.nan)
 
 
+def build_row_panel(vals: dict, schema: dict) -> pd.DataFrame:
+    """작년 자료를 붙인 행. 파생 규칙은 학습 때와 같아야 한다."""
+    v = dict(vals)
+    prev_roi = float(v["직전_ROI"])
+    prev_cost = float(v.get("직전_경영비") or v["임업경영비"])
+    v["직전_ROI_절사"] = min(max(prev_roi, -100.0), 600.0)
+    v["직전_log경영비"] = float(np.log1p(max(prev_cost, 0.0)))
+    v["경영비_증감율"] = ((float(v["임업경영비"]) - prev_cost) / prev_cost
+                     if prev_cost else np.nan)
+    v["직전_ROI_부호"] = float(np.sign(prev_roi))
+
+    row = add_derived_features(pd.DataFrame([v]))
+    for k in ("직전_ROI_절사", "직전_log경영비", "경영비_증감율", "직전_ROI_부호"):
+        row[k] = v[k]
+    X = row.reindex(columns=schema["features"])
+    for c in schema["categorical"]:
+        X[c] = pd.Categorical(X[c].astype("Int64").fillna(-1).to_numpy(dtype="int64"))
+    for c in X.columns:
+        if c not in schema["categorical"]:
+            X[c] = pd.to_numeric(X[c], errors="coerce").astype("float64")
+    return X.replace([np.inf, -np.inf], np.nan)
+
+
+def _has_panel(vals: dict) -> bool:
+    """작년 ROI를 받았고 패널 모델이 준비되어 있는가."""
+    reg = registry()
+    return (vals.get("직전_ROI") is not None
+            and reg.get("model_panel") is not None
+            and reg.get("schema_panel") is not None)
+
+
 def predict_a(vals: dict) -> dict:
     reg = registry()
     if reg["model_a"] is None:
         raise RuntimeError("Model A가 학습되지 않았습니다.")
+
+    # 작년 자료가 있으면 패널 모델을 쓴다. 설명력이 네 배 높다.
+    used = "기본"
+    if _has_panel(vals):
+        try:
+            Xp = build_row_panel(vals, reg["schema_panel"])
+            roi = float(reg["model_panel"].predict(
+                xgb.DMatrix(Xp, enable_categorical=True))[0])
+            used = "패널"
+        except Exception:  # noqa: BLE001 — 어긋나면 조용히 기본 모델로 되돌린다
+            used = "기본"
+
     schema = reg["schema_a"]
     X = build_row_a(vals, schema)
     kind = schema.get("target_transform", "none")
-    roi = float(inv_transform(
-        reg["model_a"].predict(xgb.DMatrix(X, enable_categorical=True))[0], kind))
+    if used == "기본":
+        roi = float(inv_transform(
+            reg["model_a"].predict(xgb.DMatrix(X, enable_categorical=True))[0], kind))
 
     band = None
     if reg["quantile_a"] is not None:
@@ -135,9 +186,18 @@ def predict_a(vals: dict) -> dict:
 
     cost = float(vals.get("임업경영비") or 0)
     baseline = _baseline_a(vals)
+    mp = reg.get("metrics_panel") or {}
     return {
         "roi": roi,
         "band": band,
+        "model": used,
+        "model_note": (
+            "작년 실적을 반영한 예측입니다. 같은 조건에서 설명력(R²)이 0.06에서 0.28로 "
+            "네 배 높습니다." if used == "패널" else
+            "작년 실적을 입력하시면 훨씬 정확하게 계산할 수 있습니다."),
+        "model_r2": (mp.get("임가단위_5회평균", {}).get("패널 변수 추가", {}).get("R2")
+                     if used == "패널" else
+                     (reg["metrics_a"] or {}).get("optuna_xgboost", {}).get("test", {}).get("R2")),
         "coverage": (reg["metrics_q"] or {}).get("roi", {}).get("coverage_80pct"),
         "income": roi / 100.0 * cost,
         "revenue": cost + roi / 100.0 * cost,

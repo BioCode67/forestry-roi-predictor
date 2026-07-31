@@ -422,6 +422,15 @@ const COST_PRESETS = [300, 700, 1500, 3000, 6000]
             </template>
           </Answer>
 
+          <!-- 어느 모델로 계산했는지 밝힌다. 작년 자료를 채우면 훨씬 정확해진다는 걸 알려야 한다. -->
+          <div class="modelbar mt-md" :class="{ 'modelbar--on': res.model === '패널' }">
+            <span class="modelbar__tag">{{ res.model === '패널' ? '작년 자료 반영' : '기본 계산' }}</span>
+            <span class="modelbar__txt">{{ res.model_note }}</span>
+            <span v-if="res.model_r2" class="modelbar__r2">
+              맞히는 정도 R² {{ fmt.dec(res.model_r2, 2) }}
+            </span>
+          </div>
+
           <!-- 폭 -->
           <div v-if="res.band" class="card mt-lg">
             <div class="card__head">
@@ -489,6 +498,31 @@ const COST_PRESETS = [300, 700, 1500, 3000, 6000]
 </template>
 
 <style scoped>
+.modelbar {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding: 11px 16px; border-radius: var(--r-lg);
+  border: 1px solid var(--border); background: var(--surface-2);
+  font-size: 0.83rem; color: var(--text-muted);
+}
+.modelbar--on {
+  border-color: color-mix(in srgb, var(--forest-300) 65%, var(--border));
+  background: var(--forest-50); color: var(--forest-800);
+}
+.modelbar__tag {
+  font-size: 0.7rem; font-weight: 750; letter-spacing: 0.02em;
+  padding: 3px 9px; border-radius: var(--r-pill);
+  background: var(--ink-100); color: var(--ink-600); white-space: nowrap;
+}
+.modelbar--on .modelbar__tag { background: var(--forest-200); color: var(--forest-800); }
+.modelbar__txt { flex: 1; min-width: 12ch; }
+.modelbar__r2 {
+  font-size: 0.76rem; font-variant-numeric: tabular-nums;
+  color: var(--text-subtle); white-space: nowrap;
+}
+@media (prefers-color-scheme: dark) {
+  .modelbar--on { background: #12291d; color: var(--forest-200); }
+}
+
 .card--float {
   margin-top: 0;
   margin-bottom: 26px;
