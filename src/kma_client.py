@@ -36,6 +36,17 @@ SFCTM_COLS = (
 
 MISSING = {-9.0, -99.0, -999.0, -9.9, -50.0}
 
+# kma_sfcdd3 응답 컬럼 (help=1 헤더 기준, 56개)
+SFCDD_COLS = (
+    "TM STN WS_AVG WR_DAY WD_MAX WS_MAX WS_MAX_TM WD_INS WS_INS WS_INS_TM "
+    "TA_AVG TA_MAX TA_MAX_TM TA_MIN TA_MIN_TM TD_AVG TS_AVG TG_MIN HM_AVG HM_MIN "
+    "HM_MIN_TM PV_AVG EV_S EV_L FG_DUR PA_AVG PS_AVG PS_MAX PS_MAX_TM PS_MIN "
+    "PS_MIN_TM CA_TOT SS_DAY SS_DUR SS_CMB SI_DAY SI_60M_MAX SI_60M_MAX_TM "
+    "RN_DAY RN_D99 RN_DUR RN_60M_MAX RN_60M_MAX_TM RN_10M_MAX RN_10M_MAX_TM "
+    "RN_POW_MAX RN_POW_MAX_TM SD_NEW SD_NEW_TM SD_MAX SD_MAX_TM "
+    "TE_05 TE_10 TE_15 TE_30 TE_50"
+).split()
+
 
 class KmaClient:
     def __init__(self, auth_key: str | None = None, pause: float = 0.12):
@@ -91,16 +102,30 @@ class KmaClient:
         df["일자"] = pd.to_datetime(df["TM"].str[:8], format="%Y%m%d", errors="coerce")
         return df
 
-    # -- 일자료 (승인 시) ---------------------------------------------------
+    # -- 일자료 ------------------------------------------------------------
     def daily_range(self, start: str, end: str, stn: str = "0") -> pd.DataFrame:
-        """kma_sfcdd3.php 기간 조회. start/end = YYYYMMDD"""
-        txt = self._get("kma_sfcdd3.php", {"tm1": start, "tm2": end, "stn": stn}, timeout=90)
-        rows = self._rows(txt)
+        """kma_sfcdd3.php 기간 조회. start/end = YYYYMMDD
+
+        stn=0이면 전 지점을 함께 받는다. 다만 지점 수 × 일수가 커지면 응답이
+        무거워지므로 호출 쪽에서 연 단위 등으로 끊어 쓴다.
+        """
+        txt = self._get("kma_sfcdd3.php", {"tm1": start, "tm2": end, "stn": stn}, timeout=180)
+        rows = [r for r in self._rows(txt) if len(r) >= 20]
         if not rows:
             return pd.DataFrame()
-        width = max(len(r) for r in rows)
-        df = pd.DataFrame([r + [None] * (width - len(r)) for r in rows])
-        return df
+        n = len(SFCDD_COLS)
+        df = pd.DataFrame([(r + [None] * n)[:n] for r in rows], columns=SFCDD_COLS)
+
+        num = ["STN", "TA_AVG", "TA_MAX", "TA_MIN", "TS_AVG", "TG_MIN", "HM_AVG",
+               "HM_MIN", "EV_S", "FG_DUR", "SS_DAY", "SI_DAY", "RN_DAY", "RN_DUR",
+               "RN_60M_MAX", "SD_MAX", "WS_AVG", "WS_MAX", "WS_INS", "CA_TOT",
+               "TE_05", "TE_10"]
+        for c in num:
+            if c in df.columns:
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+                df.loc[df[c].isin(MISSING), c] = pd.NA
+        df["일자"] = pd.to_datetime(df["TM"], format="%Y%m%d", errors="coerce")
+        return df.dropna(subset=["일자", "STN"])
 
 
 def daterange(start: date, end: date):

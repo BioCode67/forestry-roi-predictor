@@ -27,6 +27,8 @@ import pandas as pd
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
 
+from datetime import timedelta  # noqa: E402
+
 from kma_client import KmaClient, daterange  # noqa: E402
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -64,27 +66,43 @@ def to_annual(daily: pd.DataFrame) -> pd.DataFrame:
     d["월"] = d["일자"].dt.month
     grow = d[d["월"].isin(GROW_MONTHS)]
 
-    base = d.groupby(["STN", "연도"], observed=True).agg(
-        평균기온=("평균기온", "mean"),
-        최저기온평균=("최저기온", "mean"),
-        최고기온평균=("최고기온", "mean"),
-        연강수량=("일강수량", "sum"),
-        연일조시간=("일조합", "sum"),
-        관측일수=("일자", "nunique"),
-    )
+    agg = {
+        "평균기온": ("평균기온", "mean"),
+        "최저기온평균": ("최저기온", "mean"),
+        "최고기온평균": ("최고기온", "mean"),
+        "연강수량": ("일강수량", "sum"),
+        "연일조시간": ("일조합", "sum"),
+        "관측일수": ("일자", "nunique"),
+    }
+    for src, name in [("평균습도", "평균습도"), ("일사합", "연일사량"),
+                      ("증발량", "연증발량"), ("안개시간", "연안개시간"),
+                      ("지중온도_05m", "지중온도_05m")]:
+        if src in d.columns:
+            agg[name] = (src, "sum" if name.startswith("연") else "mean")
+    base = d.groupby(["STN", "연도"], observed=True).agg(**agg)
     g = grow.groupby(["STN", "연도"], observed=True).agg(
         생육기평균기온=("평균기온", "mean"),
         생육기강수량=("일강수량", "sum"),
     )
     frost = (d[d["최저기온"] <= 0].groupby(["STN", "연도"], observed=True)
              .size().rename("서리일수"))
+    # 초상최저기온은 지면 가까이의 온도라 실제 서리 피해와 더 직결된다
+    if "초상최저기온" in d.columns:
+        gfrost = (d[d["초상최저기온"] <= 0].groupby(["STN", "연도"], observed=True)
+                  .size().rename("초상서리일수"))
+    else:
+        gfrost = pd.Series(dtype=int, name="초상서리일수")
+    # 밤·감은 개화기(4~5월) 저온에 결실이 크게 좌우된다
+    bloom = d[d["월"].isin([4, 5])]
+    bloom_frost = (bloom[bloom["최저기온"] <= 2]
+                   .groupby(["STN", "연도"], observed=True).size().rename("개화기저온일수"))
     heat = (d[d["최고기온"] >= 33].groupby(["STN", "연도"], observed=True)
             .size().rename("폭염일수"))
     rain = (d[d["일강수량"] >= 80].groupby(["STN", "연도"], observed=True)
             .size().rename("호우일수"))
 
-    out = base.join([g, frost, heat, rain]).reset_index()
-    for c in ["서리일수", "폭염일수", "호우일수"]:
+    out = base.join([g, frost, gfrost, bloom_frost, heat, rain]).reset_index()
+    for c in ["서리일수", "초상서리일수", "개화기저온일수", "폭염일수", "호우일수"]:
         out[c] = out[c].fillna(0).astype(int)
     return out
 
@@ -110,16 +128,44 @@ def collect_hourly(client: KmaClient, start: date, end: date) -> pd.DataFrame:
 
 
 def collect_daily_api(client: KmaClient, start: date, end: date) -> pd.DataFrame:
-    """일자료 API가 열려 있을 때의 경로 (연 단위로 끊어 요청)."""
+    """일자료 API 경로. 전 지점 x 1년이면 응답이 커서 월 단위로 끊는다."""
     frames = []
     for y in range(start.year, end.year + 1):
-        s = max(start, date(y, 1, 1)).strftime("%Y%m%d")
-        e = min(end, date(y, 12, 31)).strftime("%Y%m%d")
-        df = client.daily_range(s, e)
-        if not df.empty:
-            frames.append(df)
-        print(f"  {y}: {len(df):,}행", flush=True)
+        for mth in range(1, 13):
+            s0 = date(y, mth, 1)
+            e0 = date(y + (mth == 12), (mth % 12) + 1, 1) - timedelta(days=1)
+            if e0 < start or s0 > end:
+                continue
+            s0, e0 = max(s0, start), min(e0, end)
+            try:
+                df = client.daily_range(s0.strftime("%Y%m%d"), e0.strftime("%Y%m%d"))
+            except Exception as ex:  # noqa: BLE001
+                print(f"  [fail] {y}-{mth:02d}: {ex}", flush=True)
+                continue
+            if not df.empty:
+                frames.append(df)
+        got = sum(len(f) for f in frames)
+        print(f"  {y}년까지 누적 {got:,}행", flush=True)
     return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+
+
+def aggregate_daily_api(df: pd.DataFrame) -> pd.DataFrame:
+    """일자료 원본 → 분석용 컬럼만 추린 일 단위 표."""
+    keep = {
+        "STN": "STN", "일자": "일자",
+        "TA_AVG": "평균기온", "TA_MAX": "최고기온", "TA_MIN": "최저기온",
+        "TG_MIN": "초상최저기온", "TS_AVG": "평균지면온도",
+        "HM_AVG": "평균습도", "HM_MIN": "최저습도",
+        "RN_DAY": "일강수량", "RN_DUR": "강수시간", "RN_60M_MAX": "시간최다강수",
+        "SS_DAY": "일조합", "SI_DAY": "일사합", "EV_S": "증발량",
+        "FG_DUR": "안개시간", "CA_TOT": "평균운량",
+        "WS_AVG": "평균풍속", "WS_INS": "최대순간풍속", "SD_MAX": "최심적설",
+        "TE_05": "지중온도_05m",
+    }
+    cols = [c for c in keep if c in df.columns]
+    out = df[cols].rename(columns={k: v for k, v in keep.items() if k in cols}).copy()
+    out["일강수량"] = out.get("일강수량", pd.Series(dtype=float)).fillna(0.0)
+    return out
 
 
 def main() -> int:
@@ -149,11 +195,22 @@ def main() -> int:
     has_daily = client.available(
         "kma_sfcdd3.php", {"tm1": "20230101", "tm2": "20230102", "stn": "108"})
     if has_daily:
-        print("[경로] 지상관측 일자료 API 사용 (기간 조회)")
+        print("[경로] 지상관측 일자료 API (기간 조회) — 관측값을 그대로 받는다")
         raw = collect_daily_api(client, start, end)
-        raw.to_csv(os.path.join(OUT_DIR, "asos_daily_raw.csv"),
-                   index=False, encoding="utf-8-sig")
-        print(f"[saved] 원자료 {len(raw):,}행 — 컬럼 매핑은 파일을 확인해 후처리하세요.")
+        if raw.empty:
+            print("수집 실패", file=sys.stderr)
+            return 1
+        daily = aggregate_daily_api(raw)
+        daily.to_csv(OUT_DAILY, index=False, encoding="utf-8-sig")
+        annual = to_annual(daily)
+        annual.to_csv(OUT_ANNUAL, index=False, encoding="utf-8-sig")
+        print(f"\n[saved] {OUT_DAILY}   {len(daily):,}행 (지점×일자)")
+        print(f"[saved] {OUT_ANNUAL}  {len(annual):,}행 (지점×연도)")
+        print("\n연도별 전국 평균:")
+        cols = {"평균기온": ("평균기온", "mean"), "연강수량": ("연강수량", "mean"),
+                "서리일수": ("서리일수", "mean"), "폭염일수": ("폭염일수", "mean"),
+                "개화기저온일수": ("개화기저온일수", "mean"), "지점수": ("STN", "nunique")}
+        print(annual.groupby("연도").agg(**cols).round(1).to_string())
         return 0
 
     print("[경로] 일자료 미신청 → 시간자료 표본 집계 "
