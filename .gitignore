@@ -16,3 +16,5 @@ web/dist/
 # 제출본 미리보기·중간 산출물 (코드로 다시 만들 수 있음)
 docs/_preview.html
 docs/figures_번호순/
+
+docs/_paste_web.html

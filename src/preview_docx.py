@@ -64,8 +64,11 @@ def run_html(z, rel_map, run) -> str:
         return img_tag(z, rel_map, blip.get(R + "embed"), cx)
 
     text = "".join(t.text or "" for t in run.iter(W + "t"))
+    # 한 run이 글자와 줄바꿈을 함께 가질 수 있다. 줄바꿈만 있는 경우만 보면
+    # "제공하는\n임업"이 "제공하는임업"으로 붙어 버린다.
+    br = "<br/>" if run.find(W + "br") is not None else ""
     if not text:
-        return "<br/>" if run.find(W + "br") is not None else ""
+        return br
     rPr = run.find(W + "rPr")
     css = []
     if rPr is not None:
@@ -77,7 +80,7 @@ def run_html(z, rel_map, run) -> str:
         sz = rPr.find(W + "sz")
         if sz is not None:
             css.append(f"font-size:{int(sz.get(W + 'val'))/2:.1f}pt")
-    return f"<span style='{';'.join(css)}'>{html.escape(text)}</span>"
+    return f"<span style='{';'.join(css)}'>{html.escape(text)}</span>{br}"
 
 
 def para_html(z, rel_map, p) -> str:
