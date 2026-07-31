@@ -586,6 +586,7 @@
     "표고목폐기",
     "표고세척"
   ],
+  "level_code_harmonized": 2239,
   "n_numeric_features": 165,
   "n_derived_features": 12,
   "items": {

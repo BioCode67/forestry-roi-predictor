@@ -45,6 +45,13 @@ CODEBOOK: dict[str, dict[int, str]] = {
 
 CATEGORICALS = ["품목", "연령별", "지역별", "규모별", "경영수준별", "전/겸업별"]
 
+# 「경영수준별」 코드 체계가 연도별로 다르게 배포되어 있다.
+#   2020~2022년 : 5 = 선도임가, 6 = 이외임가
+#   2023~2024년 : 1 = 선도임가, 2 = 이외임가
+# 두 체계의 구성비가 약 20:80으로 동일하며 파일설계서(2024년분)는 1/2만 문서화한다.
+# 조화하지 않으면 동일 개념이 4개 범주로 쪼개져 연도 코호트로 오분할된다.
+LEVEL_HARMONIZE = {5: 1, 6: 2}
+
 # 목표변수 정의식에 포함되거나 사후(ex-post) 실적인 항목 → 설명변수에서 전면 제외.
 #   ROI = 소득 / 경영비,  소득 = 총수입(총평가액) - 경영비
 LEAKY_PATTERNS = [
@@ -166,6 +173,10 @@ def build(df: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         if c not in df.columns:
             df[c] = pd.NA
         df[c] = pd.to_numeric(df[c], errors="coerce").astype("Int64")
+        if c == "경영수준별":
+            before = df[c].isin(LEVEL_HARMONIZE).sum()
+            df[c] = df[c].replace(LEVEL_HARMONIZE)
+            report["level_code_harmonized"] = int(before)
         lab = CODEBOOK.get(c, {})
         df[c + "_라벨"] = df[c].map(lambda v, l=lab: l.get(int(v)) if pd.notna(v) else None)
 

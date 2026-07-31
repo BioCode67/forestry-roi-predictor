@@ -86,6 +86,15 @@ def load_cost_data():
 
 
 @st.cache_data(show_spinner=False)
+def load_insights():
+    p = os.path.join(MODEL_DIR, "insights.json")
+    if not os.path.exists(p):
+        return None
+    with open(p, encoding="utf-8") as f:
+        return json.load(f)
+
+
+@st.cache_data(show_spinner=False)
 def load_codebook():
     try:
         return parse_codebook()
@@ -228,9 +237,9 @@ if np.isfinite(base_roi):
             f"차이는 **{gap:+,.0f}원**입니다."
         )
 
-tab1, tab5, tab2, tab3, tab4 = st.tabs(
-    ["📈 예측 & 경영 진단", "🌰 품목별 정밀 진단", "🚚 최적 출하시기",
-     "🏆 모델 성능 비교", "📊 데이터·방법론"]
+tab1, tab5, tab6, tab2, tab3, tab4 = st.tabs(
+    ["📈 예측 & 경영 진단", "🌰 품목별 정밀 진단", "💡 수익 개선 인사이트",
+     "🚚 최적 출하시기", "🏆 모델 성능 비교", "📊 데이터·방법론"]
 )
 
 # ---------------------------------------------------------------------------
@@ -513,6 +522,153 @@ with tab5:
             ci = os.path.join(FIG_DIR, "cost_feature_importance.png")
             if os.path.exists(ci):
                 st.image(ci, width="stretch")
+
+
+# ---------------------------------------------------------------------------
+# TAB 6 — 수익 개선 인사이트 (기술통계 계층)
+# ---------------------------------------------------------------------------
+insights = load_insights()
+
+with tab6:
+    if insights is None:
+        st.info("`python src/insights.py` 를 실행하면 인사이트가 생성됩니다.")
+    else:
+        st.caption(
+            "예측 모델이 *얼마를 벌 수 있는가* 에 답한다면, 이 탭은 "
+            "**어떻게 하면 더 벌 수 있는가** 에 대한 정량 근거를 「임산물생산비조사」 "
+            "원데이터에서 직접 추출한 결과입니다. 기술통계 계층이며 예측 모델의 "
+            "설명변수로는 사용하지 않습니다."
+        )
+
+        # --- ① 품질 등급 단가 ------------------------------------------------
+        st.subheader("① 품질 등급·가공 형태별 단가 격차")
+        grades = insights.get("등급별_단가", {})
+        gsel = st.radio("품목", list(grades), horizontal=True, key="grade_item")
+        if gsel:
+            info = grades[gsel]
+            rows = info["등급"]
+            gc1, gc2 = st.columns([3, 2])
+            with gc1:
+                f = go.Figure(go.Bar(
+                    x=[r["구분"] for r in rows],
+                    y=[r["단가_원per단위수량"] for r in rows],
+                    marker_color=[GREEN if i == 0 else GREY for i in range(len(rows))],
+                    text=[f"{r['단가_원per단위수량']:,.0f}원" for r in rows],
+                    textposition="outside",
+                ))
+                f.update_layout(height=330, yaxis_title="단가 (원 / 수량단위)",
+                                margin=dict(l=10, r=10, t=20, b=10))
+                st.plotly_chart(f, width="stretch")
+            with gc2:
+                st.dataframe(
+                    pd.DataFrame(rows).rename(columns={
+                        "단가_원per단위수량": "단가(원)", "구성비_pct": "구성비(%)"}),
+                    width="stretch", hide_index=True)
+                if info.get("직접비교_가능"):
+                    st.metric("최고 / 최저 단가 배수", f"{info['최고_최저_단가배수']:,.2f} 배")
+                st.caption(info.get("주석", ""))
+
+            sim = insights.get("등급전환_시뮬레이션", {}).get(gsel)
+            if sim:
+                st.success(
+                    f"**품질 개선 효과** — {sim['전환_시나리오']} 시 "
+                    f"단위면적당 수취액 **{sim['수취액_증가_원per단위면적']:+,.0f}원** 증가 "
+                    f"(등급 간 단가차 {sim['단가차_원']:,.0f}원 × 전환 물량). "
+                    f"선별·전정 등 품질관리 강화의 경제적 가치입니다."
+                )
+            elif not info.get("직접비교_가능"):
+                st.info(
+                    "가공 형태 구분은 원물과 가공품의 수량 기준이 달라 건조 감모율이 "
+                    "반영되지 않으므로, 물량 전환 시뮬레이션은 수행하지 않습니다."
+                )
+
+        st.markdown("---")
+
+        # --- ③ 수령별 수익성 ------------------------------------------------
+        st.subheader("② 수령(樹齡)별 수익성 곡선 — 갱신·개식 판단 근거")
+        ages = insights.get("수령별_수익성", {})
+        if ages:
+            f2 = go.Figure()
+            palette = [GREEN, AMBER, "#1565C0"]
+            for (item, info), col in zip(ages.items(), palette):
+                d = pd.DataFrame(info["구간"])
+                f2.add_trace(go.Scatter(
+                    x=d["수령구간"].astype(str), y=d["ROI중앙값"], mode="lines+markers",
+                    name=f"{item} (n={int(d['표본'].sum()):,})",
+                    line=dict(color=col, width=3), marker=dict(size=9)))
+            f2.add_hline(y=0, line_dash="dash", line_color="#888")
+            f2.update_layout(height=380, xaxis_title="수령", yaxis_title="ROI 중앙값 (%)",
+                             margin=dict(l=10, r=10, t=20, b=10),
+                             legend=dict(orientation="h", y=1.12))
+            st.plotly_chart(f2, width="stretch")
+
+            acols = st.columns(len(ages))
+            for col, (item, info) in zip(acols, ages.items()):
+                col.metric(f"{item} 최고 수익 구간", info["최고구간"],
+                           delta=f"{info['최고ROI']:,.0f}% (최저 {info['최저구간']} "
+                                 f"{info['최저ROI']:,.0f}%)")
+            st.caption(
+                "수령 구간별 ROI 중앙값입니다. 수익성이 정점을 지나 하락하는 구간은 "
+                "갱신·개식 또는 수형 개선을 검토할 시점을 시사합니다."
+            )
+
+        st.markdown("---")
+
+        # --- ④ 선도임가 격차 ------------------------------------------------
+        st.subheader("③ 선도임가 벤치마크 — 비목 구조의 차이")
+        gaps = insights.get("선도임가_격차", {})
+        if gaps:
+            lsel = st.selectbox("품목", list(gaps), key="leader_item")
+            g = gaps[lsel]
+            labels = ["노동비", "비료비", "농약비", "감가상각비", "위탁영농비"]
+            lead = [g["선도임가"].get(f"{x}_비중pct") for x in labels]
+            rest = [g["이외임가"].get(f"{x}_비중pct") for x in labels]
+
+            lc1, lc2 = st.columns([3, 2])
+            with lc1:
+                f3 = go.Figure()
+                f3.add_trace(go.Bar(x=labels, y=lead, name="선도임가", marker_color=GREEN))
+                f3.add_trace(go.Bar(x=labels, y=rest, name="이외임가", marker_color=GREY))
+                f3.update_layout(barmode="group", height=340,
+                                 yaxis_title="경영비 대비 비중 (%)",
+                                 margin=dict(l=10, r=10, t=20, b=10),
+                                 legend=dict(orientation="h", y=1.15))
+                st.plotly_chart(f3, width="stretch")
+            with lc2:
+                st.dataframe(pd.DataFrame({
+                    "비목": labels,
+                    "선도임가(%)": lead,
+                    "이외임가(%)": rest,
+                    "차이(%p)": [None if (a is None or b is None) else round(a - b, 1)
+                                for a, b in zip(lead, rest)],
+                }), width="stretch", hide_index=True)
+                st.metric("총 노동시간 (선도 / 이외)",
+                          f"{g['선도임가'].get('총노동시간', 0):,.0f} / "
+                          f"{g['이외임가'].get('총노동시간', 0):,.0f} 시간")
+            if g.get("해석_유의"):
+                st.warning("**해석 유의** — " + g["해석_유의"])
+
+        st.markdown("---")
+
+        # --- ⑤ 지역 × 품목 ---------------------------------------------------
+        st.subheader("④ 지역 × 품목 수익성 지도")
+        rm = insights.get("지역x품목", {})
+        if rm.get("matrix"):
+            mat = pd.DataFrame(rm["matrix"])
+            f4 = go.Figure(go.Heatmap(
+                z=mat.to_numpy(dtype=float), x=list(mat.columns), y=list(mat.index),
+                colorscale="RdYlGn", colorbar=dict(title="ROI 중앙값(%)"),
+                text=mat.to_numpy(dtype=float), texttemplate="%{text:,.0f}",
+                hovertemplate="%{y} · %{x}<br>ROI %{z:,.1f}%<extra></extra>"))
+            f4.update_layout(height=420, margin=dict(l=10, r=10, t=20, b=10))
+            st.plotly_chart(f4, width="stretch")
+            best = rm.get("품목별_최적지역", {})
+            if best:
+                st.dataframe(
+                    pd.DataFrame([{"품목": k, "최고 수익 지역": v["지역"],
+                                   "ROI 중앙값(%)": v["ROI"]} for k, v in best.items()]),
+                    width="stretch", hide_index=True)
+            st.caption("표본 15건 이상인 조합만 표시합니다.")
 
 
 # ---------------------------------------------------------------------------
