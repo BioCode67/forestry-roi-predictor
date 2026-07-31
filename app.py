@@ -548,11 +548,12 @@ with tab6:
             info = grades[gsel]
             rows = info["등급"]
             gc1, gc2 = st.columns([3, 2])
+            hi = int(np.argmax([r["단가_원per단위수량"] for r in rows]))
             with gc1:
                 f = go.Figure(go.Bar(
                     x=[r["구분"] for r in rows],
                     y=[r["단가_원per단위수량"] for r in rows],
-                    marker_color=[GREEN if i == 0 else GREY for i in range(len(rows))],
+                    marker_color=[GREEN if i == hi else GREY for i in range(len(rows))],
                     text=[f"{r['단가_원per단위수량']:,.0f}원" for r in rows],
                     textposition="outside",
                 ))
@@ -562,7 +563,9 @@ with tab6:
             with gc2:
                 st.dataframe(
                     pd.DataFrame(rows).rename(columns={
-                        "단가_원per단위수량": "단가(원)", "구성비_pct": "구성비(%)"}),
+                        "단가_원per단위수량": "단가(원)",
+                        "생산임가_비율_pct": "생산 임가 비율(%)",
+                        "생산임가내_물량비중_pct": "생산 임가 내 물량비중(%)"}),
                     width="stretch", hide_index=True)
                 if info.get("직접비교_가능"):
                     st.metric("최고 / 최저 단가 배수", f"{info['최고_최저_단가배수']:,.2f} 배")

@@ -142,23 +142,29 @@ def grade_unit_price(raw: pd.DataFrame) -> dict:
             continue
         rows = []
         qty_total = sum(num(sub, q).fillna(0) for _, q, _ in specs)
+        n_sub = len(sub)
         for name, qcol, vcol in specs:
             q, v = num(sub, qcol), num(sub, vcol)
             if q.notna().sum() < 20 or v.notna().sum() < 20:
                 continue
             price = robust_median(v / q.replace(0, np.nan))
-            share = robust_median((q / qty_total.replace(0, np.nan)) * 100)
             if price is None:
                 continue
+            produces = q > 0
+            # 물량 비중은 '해당 산물을 실제로 생산하는 임가' 안에서의 중앙값이다.
+            # 가공 형태는 임가마다 택일하는 경우가 많아 구분 간 합이 100%가 되지 않는다.
+            share = robust_median((q[produces] / qty_total[produces].replace(0, np.nan)) * 100)
             rows.append({
                 "구분": name,
                 "단가_원per단위수량": round(price, 1),
-                "구성비_pct": round(share, 1) if share is not None else None,
-                "표본": int((q > 0).sum()),
+                "생산임가_비율_pct": round(float(produces.mean()) * 100, 1),
+                "생산임가내_물량비중_pct": round(share, 1) if share is not None else None,
+                "표본": int(produces.sum()),
             })
         if len(rows) < 2:
             continue
-        top, bottom = rows[0], rows[-1]
+        ordered = sorted(rows, key=lambda r: -r["단가_원per단위수량"])
+        top, bottom = ordered[0], ordered[-1]
         out[item] = {
             "종류": GRADE_KIND.get(item, "구분"),
             "단위": "만본당" if "표고" in item else "ha당",
@@ -187,7 +193,7 @@ def simulate_grade_shift(raw: pd.DataFrame, insights: dict) -> dict:
     for item, info in insights.items():
         if item not in QUALITY_GRADE_ITEMS:
             continue
-        rows = info["등급"]
+        rows = sorted(info["등급"], key=lambda r: -r["단가_원per단위수량"])
         if len(rows) < 2:
             continue
         sub = raw[raw["품목"] == item]
@@ -219,19 +225,21 @@ def plot_grade(insights: dict) -> str:
         rows = insights[item]["등급"]
         names = [r["구분"] for r in rows]
         prices = [r["단가_원per단위수량"] for r in rows]
-        bars = ax.bar(names, prices, color=[GREEN if i == 0 else GREY for i in range(len(rows))])
+        hi = int(np.argmax(prices))
+        bars = ax.bar(names, prices, color=[GREEN if i == hi else GREY for i in range(len(rows))])
         for b, r in zip(bars, rows):
-            lbl = f"{r['단가_원per단위수량']:,.0f}"
-            if r["구성비_pct"] is not None:
-                lbl += f"\n({r['구성비_pct']:.0f}%)"
+            lbl = f"{r['단가_원per단위수량']:,.0f}원"
+            if r["생산임가_비율_pct"] is not None:
+                lbl += f"\n생산 {r['생산임가_비율_pct']:.0f}%"
             ax.text(b.get_x() + b.get_width() / 2, r["단가_원per단위수량"], lbl,
-                    ha="center", va="bottom", fontsize=9)
+                    ha="center", va="bottom", fontsize=8.5)
         ax.set_title(f"{item} — {insights[item]['종류']}별 단가", fontsize=11, fontweight="bold")
         ax.set_ylabel("단가 (원 / 수량단위)")
         ax.grid(axis="y", alpha=0.3)
         ax.margins(y=0.2)
-    fig.suptitle("임산물 품질 등급·가공 단계별 단가 격차 — 임산물생산비조사 원데이터",
-                 fontsize=13, fontweight="bold")
+    fig.suptitle("임산물 품질 등급·가공 형태별 단가 — 임산물생산비조사 원데이터\n"
+                 "(막대 아래 '생산 N%' = 해당 형태를 실제 생산하는 임가 비율)",
+                 fontsize=12, fontweight="bold")
     fig.tight_layout()
     p = os.path.join(FIG_DIR, "insight_grade_price.png")
     fig.savefig(p, dpi=150, bbox_inches="tight")
