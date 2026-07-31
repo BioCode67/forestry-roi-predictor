@@ -1,10 +1,18 @@
+# 배포 이미지에 들어가면 안 되는 것 — 원자료와 학습 산출물은 서빙에 쓰이지 않습니다.
 .git
-node_modules
+.github
+docs
+notebooks
 web/node_modules
-web/src
-web/public
+web/dist
 data/raw
 data/weather
-docs/figures
+data/총괄_20260731_71707_데이터
+data/임산물생산조사
+data/임산물생산비조사
+data/임업경영실태조사
+data/processed_forestry_data.csv
 **/__pycache__
+*.pyc
 *.ipynb
+app.py

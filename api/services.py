@@ -62,18 +62,38 @@ def _booster(name: str) -> xgb.Booster | None:
     return b
 
 
+class _Registry(dict):
+    """부스터는 실제로 쓸 때 올린다.
+
+    XGBoost는 8MB짜리 모델을 메모리에 30MB 넘게 펼친다. 다섯 개를 미리 다 올리면
+    166MB다. 무료 호스팅의 512MB 한도에서 이건 감당하기 어렵다. 그런데 방문자
+    대부분은 첫 화면만 보고, 첫 화면은 두 개만 쓴다. 그래서 처음 꺼낼 때 올린다.
+    """
+
+    _LAZY = {
+        "model_a": "best_xgboost_roi.json",
+        "model_b": "best_xgboost_cost.json",
+        "model_panel": "best_xgboost_panel.json",
+        "quantile_a": "quantile_roi.json",
+        "quantile_b": "quantile_cost.json",
+    }
+
+    def __missing__(self, key):
+        if key not in self._LAZY:
+            raise KeyError(key)
+        b = _booster(self._LAZY[key])
+        self[key] = b          # 없으면 None을 넣어 두어 매번 다시 찾지 않게 한다
+        return b
+
+
 @lru_cache(maxsize=1)
 def registry() -> dict:
-    """모든 산출물을 한 번에 적재해 캐시한다."""
-    reg = {
-        "model_a": _booster("best_xgboost_roi.json"),
+    """산출물 적재. 부스터만 지연 적재하고 나머지는 작아서 미리 읽는다."""
+    reg = _Registry({
         "schema_a": _json("feature_schema.json"),
         "metrics_a": _json("metrics_summary.json"),
-        "model_b": _booster("best_xgboost_cost.json"),
         "schema_b": _json("feature_schema_cost.json"),
         "metrics_b": _json("metrics_cost.json"),
-        "quantile_a": _booster("quantile_roi.json"),
-        "quantile_b": _booster("quantile_cost.json"),
         "metrics_q": _json("metrics_quantile.json"),
         "insights": _json("insights.json"),
         "production": _json("production_insights.json"),
@@ -84,10 +104,10 @@ def registry() -> dict:
         "region": _json("region_stats.json"),
         "weather_region": _json("weather_region.json"),
         "portfolio": _json("portfolio.json"),
-        "model_panel": _booster("best_xgboost_panel.json"),
+        "audit_split": _json("audit_split.json"),
         "schema_panel": _json("feature_schema_panel.json"),
         "metrics_panel": _json("metrics_panel.json"),
-    }
+    })
     try:
         reg["codebook"] = parse_codebook()
     except Exception:  # noqa: BLE001
@@ -151,7 +171,7 @@ def _has_panel(vals: dict) -> bool:
     """작년 ROI를 받았고 패널 모델이 준비되어 있는가."""
     reg = registry()
     return (vals.get("직전_ROI") is not None
-            and reg.get("model_panel") is not None
+            and reg["model_panel"] is not None
             and reg.get("schema_panel") is not None)
 
 
