@@ -199,7 +199,7 @@ p, li, td { word-break:keep-all; overflow-wrap:break-word; }
 
     <div class="panel">
       <div class="panel__t">절 고르기</div>
-      <nav class="navlist"><a class="navitem" data-nav="cover" href="#cover"><span class="navitem__n">표지</span><span>표지 · 요약표</span><span class="navitem__c">—</span></a><a class="navitem" data-nav="s1" href="#s1"><span class="navitem__n">1)</span><span>추진배경 및 필요성</span><span class="navitem__c">—</span></a><a class="navitem" data-nav="s2" href="#s2"><span class="navitem__n">2)</span><span>아이디어 기획 세부 내용</span><span class="navitem__c">—</span></a><a class="navitem" data-nav="s3" href="#s3"><span class="navitem__n">3)</span><span>데이터 분석 방법</span><span class="navitem__c">—</span></a><a class="navitem" data-nav="s4" href="#s4"><span class="navitem__n">4)</span><span>분석 내용 및 결과</span><span class="navitem__c">—</span></a><a class="navitem" data-nav="s5" href="#s5"><span class="navitem__n">5)</span><span>주요 성과 및 기대효과</span><span class="navitem__c">—</span></a></nav>
+      <nav class="navlist"><a class="navitem" data-nav="form" href="#form"><span class="navitem__n">붙임1</span><span>신청서 — 기획 개요 · 기획서 요약</span><span class="navitem__c">—</span></a><a class="navitem" data-nav="cover" href="#cover"><span class="navitem__n">표지</span><span>표지 · 요약표</span><span class="navitem__c">—</span></a><a class="navitem" data-nav="s1" href="#s1"><span class="navitem__n">1)</span><span>추진배경 및 필요성</span><span class="navitem__c">—</span></a><a class="navitem" data-nav="s2" href="#s2"><span class="navitem__n">2)</span><span>아이디어 기획 세부 내용</span><span class="navitem__c">—</span></a><a class="navitem" data-nav="s3" href="#s3"><span class="navitem__n">3)</span><span>데이터 분석 방법</span><span class="navitem__c">—</span></a><a class="navitem" data-nav="s4" href="#s4"><span class="navitem__n">4)</span><span>분석 내용 및 결과</span><span class="navitem__c">—</span></a><a class="navitem" data-nav="s5" href="#s5"><span class="navitem__n">5)</span><span>주요 성과 및 기대효과</span><span class="navitem__c">—</span></a></nav>
     </div>
 
     <button class="btn" data-copy-all>문서 전체 복사</button>
@@ -212,6 +212,46 @@ p, li, td { word-break:keep-all; overflow-wrap:break-word; }
   </aside>
 
   <main class="doc">
+  <section class="sec" id="form">
+    <div class="sec__bar">
+      <span class="sec__num">붙임1</span>
+      <span class="sec__t">신청서 — 기획 개요 · 기획서 요약</span>
+      <span class="sec__meta">본문</span>
+      <span class="sec__act">
+        <button class="btn btn--ghost" data-copy="form"
+                data-label="붙임1 신청서 — 기획 개요 · 기획서 요약을">이 절 복사</button>
+      </span>
+    </div>
+    <div class="body tablescroll">
+<p style="font-weight:700;font-size:11pt;color:#23593A">기획 개요 (분석·활용 개요)</p>
+<p>현행 임업통계는 전국·지역·업종 단위의 거시 평균으로 공표되어, 개별 임가가 “내 조건에서
+얼마를 벌 수 있는가”에 답하지 못합니다. 실제로 지역별×업종별 단순 평균을 예측기로 세워
+검증하니 설명력이 R² 0.043에 그쳤습니다. 개별 임가 성과의 4.3%밖에 설명하지 못한다는
+뜻입니다.</p>
+<p>본 과제는 임가경제조사·임산물생산비조사·임산물생산조사·임업경영실태조사 4종의
+마이크로데이터를 계층으로 결합했습니다. 임가 단위 종합 수익성은 Model A가, 품목 단위
+정밀 진단은 Model B가 맡으며, 두 모델 모두 CUDA XGBoost와 Optuna 교차검증으로
+최적화했습니다. 그 결과 Model A는 현행 방식 대비 <b>4.05배</b>(R² 0.174), Model B는
+<b>5.95배</b>(R² 0.624)의 설명력을 확보했습니다. 나아가 임가경제조사가 패널 자료라는 점을
+확인하고 직전 연도 실적을 결합하자 <b>10.2배</b>(R² 0.280)까지 올랐습니다.</p>
+<p>여기에 KAMIS 도매가격·산림청 보조금 세부사업·기상청 지상관측을 융복합해, 언제·어디에
+팔지, 등급을 어떻게 관리할지, 어떤 보조사업을 쓸지까지 금액으로 환산해 제시합니다.
+결과물은 임가가 네 가지만 고르면 답이 나오는 웹 서비스(FastAPI + Vue 3)와 전 과정을
+재현할 수 있는 분석 코드입니다.</p>
+
+<p style="font-weight:700;font-size:11pt;color:#23593A;margin-top:14pt">기획서 요약</p>
+<p>① 임업통계 4종을 임가 단위·품목 단위 2계층 모델로 결합해 개별 임가 수익성을 예측</p>
+<p>② 현행 공표 방식(단순 평균) 대비 설명력 4.05배 향상, 평균절대오차 10.2% 감소</p>
+<p>③ 임가경제조사의 패널 구조를 복원해 설명력을 10.2배까지 확대 — 새 조사 항목 없이
+연도 간 대조표만으로 얻는 개선</p>
+<p>④ 1차 학습에서 나온 R² 0.91이 데이터 누수임을 자체 적발해 0.62로 교정 (피처–타깃 상관
+0.885 → 0.344), 경위를 그대로 기재</p>
+<p>⑤ 잡음이 큰 지표임을 감추지 않고 예측구간을 함께 제시 (구간 포함률 78.2%)</p>
+<p>⑥ 출하시기 1.82배·품질등급 4.22배(밤)·지역 9.79배(잣, 시군구 17곳) 격차를 실측해 개선
+여지를 금액으로 환산</p>
+<p>⑦ 임가용 웹 서비스와 전 과정 재현 가능한 코드를 함께 제출</p>
+</div>
+  </section>
   <section class="sec" id="cover">
     <div class="sec__bar">
       <span class="sec__num">표지</span>
