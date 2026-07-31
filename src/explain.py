@@ -324,56 +324,104 @@ NEIGHBOR_LABEL = {
     "임업외소득": "임업 말고 버는 돈",
     "ha당_가용노동력": "면적당 일손",
 }
-CELL_WEIGHT = {"업종별": 3.0, "지역별": 2.0, "임지규모별": 1.0, "전/겸업별": 1.0}
+CELL_WEIGHT = {"업종별": 3.0, "지역별": 2.0, "경영비구간": 1.5,
+               "임지규모별": 1.0, "전/겸업별": 1.0}
 
 
-def neighbors_from_cells(stats: dict, vals: dict, top: int = 8) -> dict:
-    """비슷한 조건 집단을 찾아 그 안에서 무엇이 갈리는지 보여줍니다.
+def _cost_bin(vals: dict, edges) -> int | None:
+    """임업경영비가 전체 몇 분위에 드는지. 경계는 집계할 때 저장해 둔 값입니다."""
+    if not edges:
+        return None
+    c = vals.get("임업경영비")
+    if c is None:
+        return None
+    c = float(c)
+    # 경계는 원래 금액으로 저장돼 있습니다(앞뒤 끝값 포함)
+    for i in range(1, len(edges) - 1):
+        if c < edges[i]:
+            return i - 1
+    return len(edges) - 2
+
+
+def neighbors_from_cells(stats: dict, vals: dict, want_n: int = 40, top: int = 8) -> dict:
+    """비슷한 조건 집단들을 모아 그 안에서 무엇이 갈리는지 보여줍니다.
 
     예전에는 개별 임가 4,438행에서 가까운 40곳을 골랐습니다. 그러려면 행자료를
-    배포본에 실어야 하는데, 임가 단위 자료를 공개 저장소에 두는 셈이라
-    미리 집단별로 묶어 둔 값을 쓰도록 바꿨습니다.
+    배포본에 실어야 하는데, 임가 단위 자료를 공개 저장소에 두는 셈이라 미리
+    집단별로 묶어 둔 값을 쓰도록 바꿨습니다.
 
-    집단은 지역·작목·규모·전겸업이 같은 임가들이고, 5곳이 못 되는 집단은
-    애초에 만들어지지 않습니다. 딱 맞는 집단이 없으면 조건이 덜 어긋나는 쪽부터
-    찾아 갑니다. 작목이 다른 것은 지역이 다른 것보다 크게 칩니다.
+    집단 하나만 쓰면 표본이 10여 곳까지 줄어 중앙값이 흔들립니다. 그래서 조건이
+    가까운 집단부터 차례로 모아 40곳가량을 채웁니다. 합칠 때는 집단 크기로
+    가중합니다. 중앙값의 가중평균이라 엄밀한 중앙값은 아니지만, 표본이 작아
+    생기는 잡음보다는 이쪽이 낫습니다.
     """
     keys = stats.get("cell_keys") or ["지역별", "업종별", "임지규모별", "전/겸업별"]
     cells = stats.get("cells") or []
     if not cells:
         return {}
 
+    want = dict(vals)
+    if "경영비구간" in keys:
+        want["경영비구간"] = _cost_bin(vals, stats.get("경영비구간_경계"))
+
     def gap(cell):
         d = 0.0
         for i, k in enumerate(keys):
-            want, got = vals.get(k), cell["key"][i]
-            if want is None or int(want) != int(got):
+            a, b = want.get(k), cell["key"][i]
+            if a is None:
+                d += CELL_WEIGHT.get(k, 1.0)
+            elif k == "경영비구간":
+                # 구간은 순서가 있습니다. 한 칸 옆은 두 칸 옆보다 가깝습니다.
+                d += CELL_WEIGHT[k] * min(abs(int(a) - int(b)), 3) / 1.5
+            elif int(a) != int(b):
                 d += CELL_WEIGHT.get(k, 1.0)
         return d
 
-    best = min(cells, key=lambda c: (gap(c), -c["n"]))
-    d = gap(best)
+    ranked = sorted(cells, key=lambda c: (gap(c), -c["n"]))
+    picked, total = [], 0
+    for c in ranked:
+        picked.append(c)
+        total += c["n"]
+        if total >= want_n:
+            break
+    if not picked:
+        return {}
+
+    def wavg(getter):
+        num = den = 0.0
+        for c in picked:
+            v = getter(c)
+            if v is None:
+                continue
+            num += float(v) * c["n"]
+            den += c["n"]
+        return num / den if den else None
 
     diffs = []
     for c, label in NEIGHBOR_LABEL.items():
-        hi, lo = best["잘버는쪽"].get(c), best["그외"].get(c)
+        hi = wavg(lambda x, c=c: x["잘버는쪽"].get(c))
+        lo = wavg(lambda x, c=c: x["그외"].get(c))
         if hi is None or lo is None or not lo:
             continue
-        diffs.append({"항목": label, "잘버는쪽": hi, "그외": lo,
+        diffs.append({"항목": label, "잘버는쪽": round(hi, 3), "그외": round(lo, 3),
                       "차이_pct": round((hi / lo - 1) * 100, 1)})
     diffs.sort(key=lambda r: -abs(r["차이_pct"]))
 
-    qs = best.get("ROI분위수") or []
+    # 상위 수익 예시는 가장 가까운 집단의 분위수 위쪽에서 가져옵니다
+    qs = picked[0].get("ROI분위수") or []
     상위 = [round(v, 1) for v in qs[-top:][::-1]] if qs else []
 
-    맞춤 = "지역·작목·규모·전겸업이 모두 같은" if d == 0 else "조건이 가장 가까운"
+    d0 = gap(picked[0])
+    맞춤 = "조건이 모두 같은" if d0 == 0 else "조건이 가장 가까운"
     return {
-        "표본": best["n"],
-        "이웃_ROI중앙값": best["ROI중앙값"],
-        "잘버는쪽_ROI중앙값": best.get("ROI상위중앙값"),
+        "표본": total,
+        "집단수": len(picked),
+        "이웃_ROI중앙값": round(wavg(lambda c: c["ROI중앙값"]), 1),
+        "잘버는쪽_ROI중앙값": (round(wavg(lambda c: c.get("ROI상위중앙값")), 1)
+                        if any(c.get("ROI상위중앙값") is not None for c in picked) else None),
         "상위_ROI": 상위,
         "차이": diffs[:4],
-        "설명": (f"{맞춤} 임가 {best['n']}곳을 묶어, 그중 수익이 높은 쪽과 낮은 쪽이 "
-                "무엇에서 갈리는지 비교한 결과입니다. 인과가 아니라 경향입니다."),
-        "정확도": "같은 조건" if d == 0 else "가까운 조건",
+        "설명": (f"{맞춤} 임가 {total}곳을 모아, 그중 수익이 높은 쪽과 낮은 쪽이 무엇에서 "
+                "갈리는지 비교한 결과입니다. 인과가 아니라 경향입니다."),
+        "정확도": "같은 조건" if d0 == 0 else "가까운 조건",
     }

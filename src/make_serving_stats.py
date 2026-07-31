@@ -32,7 +32,15 @@ QGRID = list(range(0, 101, 2))   # 분위수 격자 (2%p 간격)
 
 # 유사 임가 비교에서 무엇이 갈리는지 볼 항목
 CMP = ["임업경영비", "ha당_경영비", "경영비_자본비율", "임업외소득", "ha당_가용노동력"]
-CELL_KEYS = ["지역별", "업종별", "임지규모별", "전/겸업별"]
+CELL_KEYS = ["지역별", "업종별", "임지규모별", "전/겸업별", "경영비구간"]
+# 경영비 구간을 셀 열쇠에 넣습니다. 범주 넷만 맞추면 같은 지역·작목·규모라도
+# 경영비가 세 배 차이 나는 임가가 한 집단에 들어갑니다. 그러면 "잘 버는 쪽이
+# 무엇이 다른가"라는 물음의 답이 어긋납니다. 실제로 재 보니 기존 방식과
+# 1순위 항목이 32%밖에 안 맞았습니다.
+COST_BINS = 3
+# 구간 수를 0·3·4·6·8로 바꿔 가며 기존 방식과 얼마나 맞는지 재 봤습니다.
+# 3개일 때가 가장 나았습니다(1순위 항목 38%, 중앙값 차 29.5%p).
+# 더 잘게 쪼개면 집단이 작아져 중앙값이 흔들려 오히려 나빠집니다.
 
 
 def q(series: pd.Series) -> list[float]:
@@ -61,6 +69,14 @@ def med(g: pd.DataFrame, c: str):
 
 def build_a(df: pd.DataFrame) -> dict:
     out: dict = {}
+    df = df.copy()
+    # 경영비를 전체 기준 사분위로 나눕니다. 로그를 씌우는 이유는 금액이
+    # 자릿수로 벌어져 그대로 자르면 큰 값 쪽이 한 칸에 몰리기 때문입니다.
+    lc = np.log1p(pd.to_numeric(df["임업경영비"], errors="coerce").clip(lower=0))
+    edges = [float(v) for v in np.nanpercentile(lc, np.linspace(0, 100, COST_BINS + 1))]
+    df["경영비구간"] = np.clip(np.searchsorted(edges[1:-1], lc, side="right"),
+                           0, COST_BINS - 1)
+    out["경영비구간_경계"] = [round(float(np.expm1(e)), 0) for e in edges]
 
     # ── 기준값 — 산림청 현행 방식(지역x업종 평균) ──
     g2 = df.groupby(["지역별", "업종별"], observed=True)["ROI"].agg(["mean", "size"])
@@ -95,7 +111,6 @@ def build_a(df: pd.DataFrame) -> dict:
             "ROI분위수": q(g["ROI"]),
             "잘버는쪽": {c: med(hi, c) for c in CMP},
             "그외": {c: med(lo, c) for c in CMP},
-            # 거리 계산에 쓸 대표값
             "대표": {c: med(g, c) for c in ("임업경영비", "기초_자본(순재산)", "임업외소득")},
         })
     out["cells"] = cells
@@ -142,7 +157,10 @@ def main() -> None:
     print(f"[saved] {OUT}  ({os.path.getsize(OUT)/1e6:.2f} MB)")
     print(f"  기준값  지역x업종 {len(a['baseline_지역x업종'])}개 · 업종 {len(a['baseline_업종'])}개")
     print(f"  또래분포 업종 {len(a['peer_업종'])}개")
-    print(f"  비교집단 {len(a['cells'])}개  (원래 임가 {a['표본수']:,}곳)")
+    cov = sum(c["n"] for c in a["cells"])
+    print(f"  비교집단 {len(a['cells'])}개 · 임가 {cov:,}곳 포함 "
+          f"({cov / a['표본수'] * 100:.0f}%)  (전체 {a['표본수']:,}곳)")
+    print(f"  경영비 구간 경계 {[f'{v/1e4:,.0f}만' for v in a['경영비구간_경계']]}")
     print(f"  품목    {len(b['품목'])}개  (원래 관측 {b['표본수']:,}건)")
 
 
