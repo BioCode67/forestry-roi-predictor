@@ -43,6 +43,24 @@ api.subsidy().then((s) => {
 const sectorLabel = computed(() => meta.value?.codebook?.업종별?.[farm.업종별] ?? '')
 const regionLabel = computed(() => meta.value?.codebook?.지역별?.[farm.지역별] ?? '')
 
+/** 같은 업종 임가의 분포 요약 — 내 위치를 숫자로 함께 보여준다 */
+const peerStat = computed(() => {
+  const v = res.value?.peer?.values
+  if (!v?.length) return null
+  const s = [...v].sort((a, b) => a - b)
+  const q = (p) => {
+    const i = (s.length - 1) * p
+    const lo = Math.floor(i), hi = Math.ceil(i)
+    return s[lo] + (s[hi] - s[lo]) * (i - lo)
+  }
+  return { median: q(0.5), q1: q(0.25), q3: q(0.75) }
+})
+
+const rank = computed(() => {
+  if (res.value?.percentile == null) return null
+  return Math.max(1, Math.round(100 - res.value.percentile))
+})
+
 const gapWon = computed(() => {
   if (!res.value?.baseline_income) return null
   return res.value.income - res.value.baseline_income
@@ -330,9 +348,34 @@ const effOption = computed(() => {
             <!-- 분포 내 위치 -->
             <div class="grid grid--2 mt-lg">
               <div class="card">
-                <div class="card__head"><h3>{{ sectorLabel }} 임가 ROI 분포 내 위치</h3></div>
+                <div class="card__head">
+                  <h3>{{ sectorLabel }} 임가 분포 내 위치</h3>
+                  <span v-if="res.peer?.n" class="badge badge--grey">
+                    표본 {{ fmt.int(res.peer.n) }}호
+                  </span>
+                </div>
                 <div class="card__body">
-                  <EChart v-if="peerOption" :option="peerOption" height="260px" />
+                  <EChart v-if="peerOption" :option="peerOption" height="250px" />
+
+                  <div class="grid grid--3 mt-md" style="gap:10px">
+                    <MetricCard label="귀 임가" :value="fmt.dec(res.roi, 0)" unit="%" accent />
+                    <MetricCard v-if="peerStat" label="같은 업종 중앙값"
+                      :value="fmt.dec(peerStat.median, 0)" unit="%"
+                      :delta="`${fmt.signed(res.roi - peerStat.median, 0)}%p`"
+                      :delta-dir="res.roi >= peerStat.median ? 'up' : 'down'" />
+                    <MetricCard v-if="peerStat" label="상위 25% 기준"
+                      :value="fmt.dec(peerStat.q3, 0)" unit="%"
+                      :delta="res.roi >= peerStat.q3 ? '이미 상위권입니다' : `${fmt.dec(peerStat.q3 - res.roi, 0)}%p 남았습니다`"
+                      delta-dir="flat" />
+                  </div>
+
+                  <div v-if="peerStat" class="note note--info mt-md fs-sm">
+                    같은 업종 임가 100곳을 잘 버는 순서로 줄 세우면 귀 임가는
+                    <b>{{ rank }}번째</b>쯤입니다.
+                    상위 25%에 들려면 ROI가 <b>{{ fmt.dec(peerStat.q3, 0) }}%</b> 이상이어야 하고,
+                    지금 조건에서 경영비를 조정하면 어디까지 갈 수 있는지는
+                    위 반응곡선에서 확인하실 수 있습니다.
+                  </div>
                 </div>
               </div>
 

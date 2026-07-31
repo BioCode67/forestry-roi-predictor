@@ -244,12 +244,22 @@ input, select { font-family: inherit; font-size: inherit; }
   .cta { display: none; }
 }
 
-.layout { display: flex; flex: 1; min-height: 0; }
+/* 사이드바는 sticky라 높이가 뷰포트까지만 찬다. 그 아래가 페이지 배경으로
+   비어 보이므로, 레이아웃 자체에 왼쪽 기둥 색을 깔아 끝까지 이어지게 한다. */
+.layout {
+  display: flex; flex: 1; min-height: 0;
+  background:
+    linear-gradient(to right,
+      var(--surface) 0, var(--surface) var(--sidebar-w),
+      var(--border) var(--sidebar-w), var(--border) calc(var(--sidebar-w) + 1px),
+      transparent calc(var(--sidebar-w) + 1px));
+}
+@media (max-width: 1080px) { .layout { background: none; } }
 .sidebar {
-  width: var(--sidebar-w); flex: none; padding-top: 96px;
+  width: var(--sidebar-w); flex: none;
   border-right: 1px solid var(--border);
   background: var(--surface);
-  padding: 20px 18px 40px;
+  padding: 96px 18px 40px;
   overflow-y: auto;
   max-height: calc(100vh - var(--header-h));
   position: sticky; top: var(--header-h);
@@ -319,7 +329,10 @@ input, select { font-family: inherit; font-size: inherit; }
   line-height: 1.66; max-width: 78ch;
 }
 
-.grid { display: grid; gap: 20px; }
+/* 좌우 카드 높이가 다를 때 짧은 쪽이 늘어나 아래가 텅 비어 보인다.
+   내용 높이만큼만 차지하게 두고, 필요한 곳에서만 stretch를 되돌린다. */
+.grid { display: grid; gap: 20px; align-items: start; }
+.grid--stretch { align-items: stretch; }
 .grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -495,6 +508,8 @@ tbody td:first-child { font-weight: 550; }
    차트
    ========================================================================== */
 .chart { width: 100%; }
+/* 카드 안 차트가 카드 폭을 다 쓰도록 */
+.card__body > .chart { margin-inline: -4px; }
 .chart--sm { height: 220px; }
 .chart--md { height: 300px; }
 .chart--lg { height: 380px; }
@@ -568,5 +583,5 @@ tbody td:first-child { font-weight: 550; }
 .mono { font-family: var(--font-mono); font-size: 0.86em; }
 .fs-sm { font-size: 0.875rem; }
 .fs-xs { font-size: 0.795rem; }
-.mt-sm { margin-top: 9px; } .mt-md { margin-top: 16px; } .mt-lg { margin-top: 26px; }
+.mt-sm { margin-top: 9px; } .mt-md { margin-top: 16px; } .mt-lg { margin-top: 30px; }
 .nowrap { white-space: nowrap; }

@@ -290,8 +290,23 @@ const distOption = computed(() => {
                     {{ overspend.map(r => `${r.item} +${fmt.dec(r.gap)}%p`).join(', ') }}
                     만큼 선도임가보다 비중이 높습니다. 해당 비목의 절감 여지를 검토하세요.
                   </div>
+                  <div v-if="res.structure?.rows?.length" class="table-wrap mt-md">
+                    <table>
+                      <thead><tr><th>비목</th><th class="num">귀 임가</th><th class="num">잘하는 농가</th><th class="num">차이</th></tr></thead>
+                      <tbody>
+                        <tr v-for="r in res.structure.rows.filter(x => x.mine != null)" :key="r.item"
+                            :class="{ 'strong-row': r.gap != null && r.gap > 2 }">
+                          <td>{{ r.item }}</td>
+                          <td class="num">{{ fmt.dec(r.mine) }}%</td>
+                          <td class="num">{{ fmt.dec(r.leader) }}%</td>
+                          <td class="num">{{ r.gap == null ? '—' : fmt.signed(r.gap) + '%p' }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
                   <p v-if="res.structure?.leader_n" class="caveat mt-sm">
-                    선도임가 표본 {{ fmt.int(res.structure.leader_n) }}호 기준 중앙값입니다.
+                    잘하는 농가 {{ fmt.int(res.structure.leader_n) }}곳의 중앙값과 비교한 값입니다.
+                    초록으로 표시된 줄은 선도 농가보다 2%p 이상 많이 쓰고 있는 비목입니다.
                   </p>
                 </div>
               </div>

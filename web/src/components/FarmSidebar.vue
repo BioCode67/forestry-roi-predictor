@@ -31,6 +31,8 @@ const years = [2019, 2020, 2021, 2022, 2023]
 
 const totalScale = computed(() =>
   fmt.won(Number(farm.임업경영비) + Number(farm['기초_자본(순재산)'])))
+
+const label = (key) => meta.value?.codebook?.[key]?.[farm[key]] ?? '—'
 </script>
 
 <template>
@@ -83,5 +85,48 @@ const totalScale = computed(() =>
       입력값을 바꾸면 모든 화면이 즉시 다시 계산됩니다.
       현재 경영 규모 합계 <b>{{ totalScale }}</b>
     </div>
+
+    <!-- 아래가 비어 보이지 않도록, 지금 조건과 계산 근거를 함께 밝힙니다 -->
+    <div class="sb-foot">
+      <p class="sb-foot__head">지금 조건 요약</p>
+      <dl class="sb-foot__list">
+        <div><dt>지역</dt><dd>{{ label('지역별') }}</dd></div>
+        <div><dt>업종</dt><dd>{{ label('업종별') }}</dd></div>
+        <div><dt>임지</dt><dd>{{ label('임지규모별') }}</dd></div>
+        <div><dt>기준 연도</dt><dd>{{ farm.조사연도 }}년</dd></div>
+      </dl>
+
+      <p class="sb-foot__head" style="margin-top:18px">계산에 쓰인 자료</p>
+      <ul class="sb-foot__src">
+        <li>임가경제조사 2019~2023</li>
+        <li>임산물생산비조사 2018~2024</li>
+        <li>임산물생산조사 2022~2024</li>
+        <li>임업경영실태조사 2018·2020</li>
+      </ul>
+      <p class="sb-foot__note">
+        전국 임가를 조사한 국가승인통계로 계산한 참고 예측입니다.
+        실제 수익은 산의 상태와 그해 날씨·시세에 따라 달라집니다.
+      </p>
+    </div>
   </template>
 </template>
+
+<style scoped>
+.sb-foot { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--border); }
+.sb-foot__head {
+  font-size: 0.7rem; font-weight: 750; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--text-subtle); margin-bottom: 10px;
+}
+.sb-foot__list { margin: 0; display: flex; flex-direction: column; gap: 7px; }
+.sb-foot__list > div { display: flex; justify-content: space-between; gap: 10px; font-size: 0.82rem; }
+.sb-foot__list dt { color: var(--text-subtle); margin: 0; }
+.sb-foot__list dd { margin: 0; font-weight: 620; text-align: right; }
+.sb-foot__src {
+  margin: 0; padding-left: 15px; display: flex; flex-direction: column; gap: 5px;
+  font-size: 0.79rem; color: var(--text-muted);
+}
+.sb-foot__note {
+  margin-top: 16px; font-size: 0.76rem; line-height: 1.6; color: var(--text-subtle);
+  padding-left: 11px; border-left: 2px solid var(--border-strong);
+}
+</style>
