@@ -5,6 +5,7 @@ import MetricCard from '../components/MetricCard.vue'
 import SectionHead from '../components/SectionHead.vue'
 import PageHero from '../components/PageHero.vue'
 import StatStrip from '../components/StatStrip.vue'
+import RegionMap from '../components/RegionMap.vue'
 import PageHead from '../components/PageHead.vue'
 import DataState from '../components/DataState.vue'
 import { api, fmt } from '../lib/api'
@@ -14,6 +15,9 @@ const prod = ref(null)
 const loading = ref(true)
 const error = ref('')
 const picked = ref('밤')
+
+const region = ref(null)
+api.region().then((d) => { region.value = d }).catch(() => {})
 
 api.production()
   .then((d) => { prod.value = d })
@@ -199,6 +203,24 @@ const allTrendOption = computed(() => {
                   값이 높은 지역은 품종·등급 구성이나 파는 곳이 다를 수 있습니다.
                 </p>
               </div>
+            </div>
+          </div>
+
+          <div v-if="region?.통계?.[picked]" class="card mt-lg">
+            <div class="card__head">
+              <h3>{{ picked }} — 전국 시·군 지도</h3>
+              <span class="badge badge--green">
+                {{ region.통계[picked].지역수 }}개 시·군 · {{ region.통계[picked].연도 }}년
+              </span>
+            </div>
+            <div class="card__body">
+              <p class="fs-sm muted" style="margin-bottom:12px">
+                같은 {{ picked }}인데 시·군에 따라 kg당 받는 값이
+                <b>{{ fmt.dec(region.통계[picked].격차_배, 1) }}배</b> 차이납니다
+                ({{ region.통계[picked].최고.지역 }} {{ fmt.int(region.통계[picked].최고.단가) }}원 ·
+                {{ region.통계[picked].최저.지역 }} {{ fmt.int(region.통계[picked].최저.단가) }}원).
+              </p>
+              <RegionMap :stats="region.통계[picked]" :item="picked" />
             </div>
           </div>
 

@@ -27,6 +27,7 @@ export const api = {
   production: () => req('/api/production'),
   management: () => req('/api/management'),
   subsidy: () => req('/api/subsidy'),
+  region: () => req('/api/region'),
 }
 
 /* ---------------------------------------------------------------- 포맷터 */

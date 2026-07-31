@@ -74,6 +74,8 @@ def registry() -> dict:
         "subsidy": _json("subsidy_programs.json"),
         "sector_profile": _json("sector_profile.json"),
         "item_profile": _json("item_cost_profile.json"),
+        "region": _json("region_stats.json"),
+        "weather_region": _json("weather_region.json"),
     }
     try:
         reg["codebook"] = parse_codebook()

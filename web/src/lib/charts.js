@@ -5,20 +5,20 @@
  */
 import * as echarts from 'echarts/core'
 import {
-  BarChart, LineChart, ScatterChart, BoxplotChart, HeatmapChart, CustomChart,
+  BarChart, LineChart, ScatterChart, BoxplotChart, HeatmapChart, CustomChart, MapChart,
 } from 'echarts/charts'
 import {
   GridComponent, TooltipComponent, LegendComponent, MarkLineComponent,
   MarkAreaComponent, DataZoomComponent, VisualMapComponent, TitleComponent,
-  GraphicComponent,
+  GraphicComponent, GeoComponent,
 } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 
 echarts.use([
-  BarChart, LineChart, ScatterChart, BoxplotChart, HeatmapChart, CustomChart,
+  BarChart, LineChart, ScatterChart, BoxplotChart, HeatmapChart, CustomChart, MapChart,
   GridComponent, TooltipComponent, LegendComponent, MarkLineComponent,
   MarkAreaComponent, DataZoomComponent, VisualMapComponent, TitleComponent,
-  GraphicComponent, CanvasRenderer,
+  GraphicComponent, GeoComponent, CanvasRenderer,
 ])
 
 export { echarts }
