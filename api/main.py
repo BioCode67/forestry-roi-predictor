@@ -89,6 +89,27 @@ class ItemInput(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+@app.on_event("startup")
+def warm_up():
+    """첫 화면이 쓰는 모델만 미리 올려 둡니다.
+
+    지연 적재 덕에 메모리는 아꼈지만, 처음 들어온 사람이 예측 단추를 눌렀을 때
+    10초를 기다리게 됩니다. 첫인상이 그걸로 정해집니다. 첫 화면에 반드시 필요한
+    둘만 백그라운드에서 올려 두고, 나머지(품목·패널)는 그대로 지연 적재에
+    맡깁니다. 서버 기동 자체는 막지 않으므로 헬스체크가 늦어지지 않습니다.
+    """
+    import threading
+
+    def load():
+        try:
+            reg = svc.registry()
+            reg["model_a"], reg["quantile_a"]
+        except Exception:  # noqa: BLE001 — 예열에 실패해도 서비스는 떠야 한다
+            pass
+
+    threading.Thread(target=load, daemon=True).start()
+
+
 @app.get("/api/health")
 def health():
     """가벼워야 합니다. 호스팅 쪽에서 주기적으로 두드리는 자리라, 여기서
