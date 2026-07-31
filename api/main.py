@@ -91,15 +91,20 @@ class ItemInput(BaseModel):
 # ---------------------------------------------------------------------------
 @app.get("/api/health")
 def health():
+    """가벼워야 합니다. 호스팅 쪽에서 주기적으로 두드리는 자리라, 여기서
+    부스터를 꺼내 쓰면 지연 적재를 해 둔 의미가 없어집니다. 파일이 있는지만
+    보고 실제 적재는 첫 예측 요청에 맡깁니다."""
     reg = svc.registry()
     return {
         "status": "ok",
         "models": {
-            "model_a": reg["model_a"] is not None,
-            "model_b": reg["model_b"] is not None,
-            "quantile_a": reg["quantile_a"] is not None,
-            "quantile_b": reg["quantile_b"] is not None,
+            "model_a": svc.model_ready("best_xgboost_roi.json"),
+            "model_b": svc.model_ready("best_xgboost_cost.json"),
+            "model_panel": svc.model_ready("best_xgboost_panel.json"),
+            "quantile_a": svc.model_ready("quantile_roi.json"),
+            "quantile_b": svc.model_ready("quantile_cost.json"),
         },
+        "loaded": sorted(k for k in svc._Registry._LAZY if k in reg),
         "datasets": {
             "insights": reg["insights"] is not None,
             "production": reg["production"] is not None,

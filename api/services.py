@@ -58,8 +58,17 @@ def _booster(name: str) -> xgb.Booster | None:
         return None
     b = xgb.Booster()
     b.load_model(p)
-    b.set_param({"device": "cpu"})   # 서빙은 CPU로 충분하다
+    # 서빙은 CPU로 충분하다. 다만 무료 등급은 CPU 지분이 0.1개인데 xgboost는
+    # 호스트가 보고하는 코어 수만큼 스레드를 띄운다. 그러면 실제로 쓸 수 있는
+    # 몫을 여럿이 나눠 갖느라 오히려 느려진다. 한 개로 묶어 둔다.
+    b.set_param({"device": "cpu", "nthread": 1})
     return b
+
+
+def model_ready(name: str) -> bool:
+    """모델 파일이 놓여 있는지만 봅니다. 적재는 하지 않습니다."""
+    base = os.path.join(MODEL_DIR, name)
+    return os.path.exists(base) or os.path.exists(os.path.splitext(base)[0] + ".ubj")
 
 
 class _Registry(dict):

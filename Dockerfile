@@ -21,7 +21,10 @@ FROM python:3.11-slim
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
-    PORT=8000
+    PORT=8000 \
+    OMP_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1
 
 # xgboost가 libgomp를 필요로 합니다. slim 이미지에는 없습니다.
 RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
