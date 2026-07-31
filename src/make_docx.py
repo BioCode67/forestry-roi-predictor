@@ -145,7 +145,7 @@ def CODE(doc, text):
         _shade(p, "F4F6F7")
 
 
-def TABLE(doc, rows, widths=None, align_right=None, size=9.6):
+def TABLE(doc, rows, widths=None, align_right=None, size=9.1):
     """첫 줄을 머리로 보고 음영을 넣습니다. align_right는 우측 정렬할 열 번호."""
     align_right = align_right or []
     t = doc.add_table(rows=len(rows), cols=len(rows[0]))
@@ -156,9 +156,9 @@ def TABLE(doc, rows, widths=None, align_right=None, size=9.6):
             cell = t.cell(ri, ci)
             cell.text = ""
             p = cell.paragraphs[0]
-            p.paragraph_format.space_after = Pt(1.5)
-            p.paragraph_format.space_before = Pt(1.5)
-            p.paragraph_format.line_spacing = 1.2
+            p.paragraph_format.space_after = Pt(0.8)
+            p.paragraph_format.space_before = Pt(0.8)
+            p.paragraph_format.line_spacing = 1.12
             if ci in align_right and ri > 0:
                 p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
             elif ri == 0:
@@ -174,7 +174,7 @@ def TABLE(doc, rows, widths=None, align_right=None, size=9.6):
         for ci, w in enumerate(widths):
             for row in t.rows:
                 row.cells[ci].width = Cm(w)
-    doc.add_paragraph().paragraph_format.space_after = Pt(4)
+    doc.add_paragraph().paragraph_format.space_after = Pt(2)
     return t
 
 
@@ -185,12 +185,12 @@ def FIGURE(doc, name, caption, width=16.4):
         return
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.paragraph_format.space_before = Pt(8)
-    p.paragraph_format.space_after = Pt(3)
+    p.paragraph_format.space_before = Pt(6)
+    p.paragraph_format.space_after = Pt(2)
     p.add_run().add_picture(path, width=Cm(width))
     c = doc.add_paragraph()
     c.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    c.paragraph_format.space_after = Pt(10)
+    c.paragraph_format.space_after = Pt(8)
     _font(c.add_run(caption), 9, False, MUTED)
 
 
@@ -283,7 +283,12 @@ def build():
     P(doc, "본 과제는 이 세 가지를 실제로 구현하고, **전국 어느 임가든 웹에서 바로 쓸 수 있는 "
            "서비스**까지 완성했습니다.")
 
-    FIGURE(doc, "fig08_data.png", "[그림 1] 활용 데이터 구성 — 임업통계 4종(필수) + 공공데이터 3종", 14.6)
+    FIGURE(doc, "fig09_distribution.png",
+           "[그림 1] 임가 ROI 분포 — 평균은 대표값이 아니다", 12.5)
+    P(doc, "분포가 오른쪽으로 길게 늘어져 있어 평균(155.5%)이 중앙값(약 87%)보다 크게 위쪽에 "
+           "놓입니다. 임가의 80%는 −38%에서 429% 사이에 흩어져 있습니다. 이 폭을 감춘 채 하나의 "
+           "평균만 전달하는 것이 현행 통계 환류의 가장 큰 문제입니다.", 9.8, MUTED)
+    FIGURE(doc, "fig08_data.png", "[그림 2] 활용 데이터 구성 — 임업통계 4종(필수) + 공공데이터 3종", 11.4)
 
     # ══════════════════════════════════════════════════════════ 2)
     H1(doc, "2) 아이디어 기획 세부 내용")
@@ -344,7 +349,7 @@ def build():
         ["서비스", "FastAPI (Python) + Vue 3 / Vite / Apache ECharts"],
     ], widths=[2.6, 13.8])
 
-    FIGURE(doc, "fig07_pipeline.png", "[그림 2] 분석 파이프라인 전 과정", 16.4)
+    FIGURE(doc, "fig07_pipeline.png", "[그림 3] 분석 파이프라인 전 과정", 13.2)
 
     # ══════════════════════════════════════════════════════════ 3)
     H1(doc, "3) 데이터 분석 방법")
@@ -408,7 +413,7 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
     NOTE(doc, "**성능은 0.29 내려갔지만, 그 0.62가 실제로 쓸 수 있는 숫자입니다.** "
               "이 경위를 감추지 않고 보고서와 서비스 화면에 그대로 기재했습니다.", "warn")
 
-    FIGURE(doc, "fig02_leakage.png", "[그림 3] 데이터 누수 자체 적발 및 교정 경위", 16.0)
+    FIGURE(doc, "fig02_leakage.png", "[그림 4] 데이터 누수 자체 적발 및 교정 경위", 12.9)
 
     H2(doc, "마. 모델링 절차")
     TABLE(doc, [
@@ -420,6 +425,25 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
         ["④ GPU 병렬", "NVIDIA A6000 2장에 trial을 라운드로빈 배정"],
         ["⑤ 테스트셋 평가", "최종 파라미터 확정 후 단 한 번만 열었음"],
     ], widths=[3.4, 13.0])
+
+    P(doc, "탐색으로 고른 주요 하이퍼파라미터는 다음과 같습니다. 두 모델의 값이 크게 다른 것은 "
+           "자료의 성격 차이를 그대로 반영합니다. 설명변수가 22개뿐인 Model A는 깊게(max_depth 10) "
+           "파고들어야 신호를 잡을 수 있고, 169개인 Model B는 얕게 두되 규제를 강하게(reg_lambda 12.1) "
+           "걸어야 과적합을 피할 수 있습니다.")
+    pa, pb = A["optuna_xgboost"]["best_params"], B["optuna_xgboost"]["best_params"]
+    TABLE(doc, [
+        ["하이퍼파라미터", "Model A", "Model B", "의미"],
+        ["learning_rate", f"{pa['learning_rate']:.4f}", f"{pb['learning_rate']:.4f}", "한 걸음의 보폭"],
+        ["max_depth", str(pa["max_depth"]), str(pb["max_depth"]), "나무의 깊이"],
+        ["subsample", f"{pa['subsample']:.3f}", f"{pb['subsample']:.3f}", "행 표본 비율"],
+        ["colsample_bytree", f"{pa['colsample_bytree']:.3f}", f"{pb['colsample_bytree']:.3f}", "열 표본 비율"],
+        ["reg_lambda", f"{pa['reg_lambda']:.3f}", f"{pb['reg_lambda']:.3f}", "L2 규제 강도"],
+        ["gamma", f"{pa['gamma']:.3f}", f"{pb['gamma']:.3f}", "분기 최소 이득"],
+        ["n_estimators", f"{A['optuna_xgboost']['n_estimators']:,}",
+         f"{B['optuna_xgboost']['n_estimators']:,}", "나무 개수 (조기 종료)"],
+        ["탐색 시행", f"{A['optuna_xgboost']['n_trials']} trial",
+         f"{B['optuna_xgboost']['n_trials']} trial", "Optuna TPE"],
+    ], widths=[4.0, 3.0, 3.0, 6.4], align_right=[1, 2])
 
     H2(doc, "바. 활용 프로그램")
     P(doc, "Python 3.11 / XGBoost(CUDA) / Optuna / scikit-learn / pandas / NumPy / SciPy / "
@@ -442,13 +466,27 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
         ["개선 배수", "**×4.05**", "−7.1%", "**×5.95**", "−35.2%"],
     ], widths=[4.6, 2.9, 3.0, 2.9, 3.0], align_right=[1, 2, 3, 4])
 
-    FIGURE(doc, "fig01_benchmark.png", "[그림 4] 동일 분할·동일 지표에서의 3종 모델 비교", 16.0)
+    FIGURE(doc, "fig01_benchmark.png", "[그림 5] 동일 분할·동일 지표에서의 3종 모델 비교", 12.9)
 
     NOTE(doc, "**결과의 정직한 해석.** Model A의 R² 0.1736은 절대 수치로 높지 않습니다. 이는 모델의 "
               "한계가 아니라 **임가경제조사 총괄표가 담을 수 있는 정보의 한계**입니다. 산의 수령·수종 "
               "구성·경사·토양·판로 같은 결정적 변수가 총괄표에 없습니다. 실제로 이런 변수를 담은 "
               "임산물생산비조사(Model B)에서는 R²가 0.62까지 올라갑니다. "
               "**두 모델의 격차 자체가 “어떤 자료를 더 모아야 하는가”에 대한 답입니다.**", "warn")
+
+    P(doc, "Model B를 품목별로 나누어 보면 성능이 표본 수를 그대로 따라갑니다. "
+           "**표고 노지는 R²가 음수(−0.052)입니다.** 테스트 표본이 32건뿐이라 모델이 평균보다도 "
+           "못 맞힌다는 뜻입니다. 감추지 않고 그대로 싣고, 서비스 화면에서도 해당 품목에는 "
+           "“표본이 적어 참고만 하십시오”라고 표시합니다.")
+    pit = B["per_item_test"]
+    rows = [["품목", "Test R²", "RMSE", "MAE", "테스트 표본", "판정"]]
+    for k, v in sorted(pit.items(), key=lambda kv: -kv[1]["R2"]):
+        judge = "양호" if v["R2"] > 0.3 else ("제한적" if v["R2"] > 0 else "표본 부족")
+        rows.append([k, f"{v['R2']:.4f}", f"{v['RMSE']:.1f}", f"{v['MAE']:.1f}",
+                     f"{v['n']}건", judge])
+    TABLE(doc, rows, widths=[2.6, 2.4, 2.4, 2.4, 2.6, 2.8], align_right=[1, 2, 3, 4])
+    FIGURE(doc, "fig10_per_item.png",
+           "[그림 6] 품목별 성능은 표본 수를 따라간다 — 잘 안 되는 품목도 감추지 않았다", 12.9)
 
     H2(doc, "나. 결과 ② 예측구간이 실제로 맞는다")
     TABLE(doc, [
@@ -462,9 +500,40 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
     ], widths=[2.8, 4.4, 2.8, 2.8, 3.6], align_right=[1, 2, 3, 4])
     P(doc, "양쪽 꼬리가 각각 10~13%로 고르게 분포합니다. 구간이 한쪽으로 치우치지 않았다는 뜻입니다.")
 
-    FIGURE(doc, "fig03_coverage.png", "[그림 5] 분위수 회귀 예측구간의 실제 포함률", 12.6)
+    FIGURE(doc, "fig03_coverage.png", "[그림 7] 분위수 회귀 예측구간의 실제 포함률", 9.8)
 
-    H2(doc, "다. 결과 ③ 품질 관리의 수익 기여를 금액으로 환산")
+    H2(doc, "다. 결과 ③ 사례 연구 — 한 임가에게 실제로 무엇을 말해 주는가")
+    P(doc, "지표만 늘어놓으면 이 분석이 현장에서 어떻게 쓰이는지 보이지 않습니다. "
+           "실제 입력에 대한 시스템의 출력을 그대로 옮깁니다.")
+    TABLE(doc, [
+        ["입력 항목", "값"],
+        ["지역 / 업종", "충남 / 밤재배업"],
+        ["임지 규모 / 전겸업", "5~10ha 미만 / 임업주업"],
+        ["경영주 연령 / 가구원", "60대 / 3명"],
+        ["연간 임업경영비", "1,500만원"],
+        ["기초 자본(순재산) / 연초 보유", "3억원 / 500만원"],
+    ], widths=[5.6, 10.8])
+    P(doc, "**① 예측** — ROI **111.0%** (P10 −48.9% ~ P90 286.9%). "
+           "집단 평균 방식은 같은 조건에 233.2%를 제시하지만, 이 임가의 경영비·자본 구조를 "
+           "반영하면 그보다 낮게 나옵니다. 구간이 넓다는 사실 자체가 “확정된 수익이 아니다”라는 "
+           "정보입니다.")
+    P(doc, "**② 설명** — 전체 평균 152.7%에서 이 임가의 111.0%까지, 무엇이 얼마나 끌어내렸는지 "
+           "가법 분해합니다. 경영비 −63.5%p, 임지 규모 −41.5%p가 주된 하락 요인이고, "
+           "작목(+31.1%p)과 전업 여부(+22.1%p)가 이를 일부 상쇄합니다.")
+    P(doc, "**③ 처방** — 같은 조건 임가의 중앙값(152.3%)을 목표로 반사실 탐색을 수행한 결과, "
+           "**한 해 경영비를 1,500만원에서 750만원으로 조정하면 예측 ROI는 195.9%**로 오릅니다. "
+           "다만 이는 비율의 개선이며 소득 총액과는 다른 문제라는 점을 화면에 함께 표시합니다.")
+    FIGURE(doc, "fig12_case.png",
+           "[그림 8] 사례 — 예측 근거의 분해(좌)와 반사실 처방(우)", 13.2)
+    P(doc, "**④ 비교** — 조건이 가장 비슷한 임가 40곳의 ROI 중앙값은 146.2%이며, 그중 잘 버는 "
+           "쪽은 247.6%입니다. 두 집단을 가르는 가장 큰 차이는 **면적당 일손(+300%)**과 "
+           "**면적당 쓰는 돈(+270.9%)**이었습니다. 같은 금액을 쓰더라도 더 좁은 면적에 집중해 "
+           "투입하는 쪽이 수익률이 높다는 뜻으로, 앞의 처방과 방향이 일치합니다.")
+    NOTE(doc, "이 네 단계가 본 시스템의 핵심입니다. **예측만 주면 임가는 믿을 이유가 없고, "
+              "설명만 주면 무엇을 할지 모릅니다.** 예측·설명·처방·비교를 함께 제시해야 "
+              "비로소 의사결정에 쓸 수 있습니다.")
+
+    H2(doc, "라. 결과 ④ 품질 관리의 수익 기여를 금액으로 환산")
     g, sim = IN["등급별_단가"]["밤"], IN["등급전환_시뮬레이션"]["밤"]
     P(doc, f"밤의 등급 간 단가 격차는 **최고/최저 {g['최고_최저_단가배수']:.2f}배**입니다. "
            f"물량 보존(같은 산물의 등급 간 이동)을 가정하고 **{sim['전환_시나리오']}** 시 "
@@ -477,9 +546,34 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
            f"대추는 {age['대추']['최고구간']}({age['대추']['최고ROI']:.0f}%)이 정점입니다. "
            "임목 갱신 판단의 정량적 근거가 됩니다.")
 
-    FIGURE(doc, "fig06_insight.png", "[그림 6] 등급 전환 효과 및 수령 구간별 수익성", 16.0)
+    FIGURE(doc, "fig06_insight.png", "[그림 9] 등급 전환 효과 및 수령 구간별 수익성", 12.9)
 
-    H2(doc, "라. 결과 ④ 작목 조합 위험 분산, 그리고 예상 밖의 발견")
+    H2(doc, "마. 결과 ⑤ 지역 — 어디서 무엇이 잘 되고, 어디가 값을 더 받는가")
+    P(doc, "임산물생산조사 196,579개 관측을 시군구 단위로 집계해 두 가지를 봤습니다. "
+           "하나는 **어느 지역에서 어떤 품목이 실제로 수익을 내는가**이고, 다른 하나는 "
+           "**같은 품목이라도 지역에 따라 단가가 얼마나 다른가**입니다.")
+    FIGURE(doc, "fig11_heatmap.png",
+           "[그림 10] 지역×품목 수익성 — 조사 임가 15곳 이상인 조합만 표시", 11.8)
+    P(doc, "빈 칸이 많다는 사실 자체가 정보입니다. 대부분의 지역·품목 조합은 표본이 15곳에 "
+           "미치지 못해 판단할 수 없습니다. 그런 칸에 억지로 숫자를 채우지 않았습니다.")
+    prem = json.load(open(os.path.join(ROOT, "models", "production_insights.json"),
+                          encoding="utf-8"))
+    lq = prem["지역특화도_LQ"]["밤"]
+    rows = [["시도", "LQ (특화도)", "생산금액", "전국 비중"]]
+    for r in lq["상위지역"][:5]:
+        rows.append([r["시도"], f"{r['LQ']:.2f}", f"{r['생산금액']/1e8:,.0f}억원",
+                     f"{r['전국비중_pct']:.1f}%"])
+    TABLE(doc, rows, widths=[3.2, 3.4, 4.0, 3.2], align_right=[1, 2, 3])
+    P(doc, f"밤의 충남 LQ는 {lq['상위지역'][0]['LQ']:.2f}로, 전국 생산금액의 "
+           f"{lq['상위지역'][0]['전국비중_pct']:.1f}%가 한 시도에 몰려 있습니다. "
+           "LQ(입지계수)는 그 지역 산업 구성에서 해당 품목이 전국 평균보다 얼마나 큰 비중을 "
+           "차지하는지 재는 지표로, 1을 넘으면 특화되었다고 봅니다.")
+    FIGURE(doc, "fig13_premium.png",
+           "[그림 11] 같은 밤이라도 지역에 따라 kg당 값이 다르다 (2024년)", 12.0)
+    P(doc, "주산지가 반드시 단가가 높은 것은 아닙니다. 물량이 몰리는 곳은 오히려 단가가 눌리는 "
+           "경향이 있어, **생산 특화도와 단가 프리미엄을 함께 봐야** 출하처 판단이 가능합니다.")
+
+    H2(doc, "바. 결과 ⑥ 작목 조합 위험 분산, 그리고 예상 밖의 발견")
     P(doc, "임업 조언은 대개 “무엇이 가장 돈이 되는가”만 답합니다. 그러나 임가가 실제로 겪는 문제는 "
            "**그해 시세와 작황이 흔들린다**는 것입니다. 금융의 평균–분산 접근을 임산물 ROI에 "
            "적용했습니다.")
@@ -511,7 +605,7 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
              f"작목 간 상관을 일률적으로 0.3으로 보는 보수적 가정에서도 효율 "
              f"{PF['보수가정']['효율']}로 결론이 유지됩니다.")
 
-    FIGURE(doc, "fig04_portfolio.png", "[그림 7] 작목 조합의 위험–수익 지도 (평균–분산 접근)", 13.4)
+    FIGURE(doc, "fig04_portfolio.png", "[그림 12] 작목 조합의 위험–수익 지도 (평균–분산 접근)", 10.6)
 
     ratio = bp["임가격차_pct"] / bp["연도변동_pct"]
     NOTE(doc, f"**그런데 더 중요한 발견이 있습니다.** 최적 조합의 연도 변동은 ±{bp['연도변동_pct']}%p인데, "
@@ -525,9 +619,9 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
            f"**{lead['선도임가']['ROI중앙값']}%**, 그 외({lead['표본']['이외임가']}곳)는 "
            f"**{lead['이외임가']['ROI중앙값']}%**입니다. 같은 품목, 같은 해에도 이만큼 벌어집니다.")
 
-    FIGURE(doc, "fig05_risk_split.png", "[그림 8] 수익 분산의 원천 분해 — 임가 효과 대 연도 효과", 14.6)
+    FIGURE(doc, "fig05_risk_split.png", "[그림 13] 수익 분산의 원천 분해 — 임가 효과 대 연도 효과", 11.6)
 
-    H2(doc, "마. 결과 ⑤ 그 밖의 분석")
+    H2(doc, "사. 결과 ⑦ 그 밖의 분석")
     BUL(doc, "**지역 특화도(LQ)** — 밤은 충남 LQ 6.73(전국 생산금액의 59.1%)으로 압도적 주산지.")
     BUL(doc, "**가공 손익분기** — 생표고 8.0kg가 건표고 1kg이 되므로 단가 배수가 8.0배를 넘어야 "
              "가공이 유리한데, **실제 배수는 4.13배**. 원물 직판 대비 −48.4%로 **원물 직판이 유리**. "
@@ -538,7 +632,7 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
              "**실패한 시도도 그대로 기록했습니다.** 임가경제조사가 시도(9개) 단위여서 기상의 국지성이 "
              "희석되기 때문으로 판단하며, 이는 **조사 설계에 대한 시사점**입니다.")
 
-    H2(doc, "바. 결과 ⑥ 서비스 구현")
+    H2(doc, "아. 결과 ⑧ 서비스 구현")
     P(doc, "FastAPI + Vue 3 웹 애플리케이션으로 전 기능을 제공합니다. 임가가 조건을 바꾸면 모든 화면이 "
            "즉시 재계산됩니다. 화면 구성은 **임업 종사자가 쓸 수 있는 말**로 전면 재작성했습니다.")
     TABLE(doc, [
@@ -580,7 +674,25 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
     P(doc, "**④ 가공 지원의 재검토.** 표고 가공은 손익분기 8.0배에 실제 4.13배로 미달합니다. "
            "가공 시설 지원이 항상 유리하지 않다는 것을 보여줍니다.")
 
-    H2(doc, "다. 기대효과")
+    H2(doc, "다. 현장 활용 시나리오")
+    TABLE(doc, [
+        ["시점", "임가가 하는 일", "시스템이 답하는 것"],
+        ["연초 · 영농 계획", "올해 경영비를 얼마로 잡을지 정한다",
+         "경영비 구간별 예측 ROI 곡선과 같은 조건 임가의 중앙값"],
+        ["봄 · 투자 판단", "임목 갱신·시설 도입을 검토한다",
+         "수령 구간별 수익성, 보조사업 자부담률 기반 실효 ROI"],
+        ["여름 · 품질 관리", "선별·전정에 얼마나 품을 들일지 정한다",
+         "등급 전환 시 ha당 수취액 증가분(밤 기준 +75,178원)"],
+        ["가을 · 출하", "언제, 어디로 낼지 정한다",
+         "KAMIS 월별 도매가 추이, 시군구 단가 프리미엄"],
+        ["연말 · 복기", "올해 결과가 어땠는지 확인한다",
+         "유사 임가 40곳과의 비교, 잘 버는 쪽과의 투입 구조 차이"],
+    ], widths=[2.8, 5.6, 8.0])
+    P(doc, "임업은 결정과 결과 사이의 간격이 긴 산업입니다. 밤나무를 새로 심으면 수확까지 여러 해가 "
+           "걸립니다. 그래서 **결정 시점에 근거를 주는 것**이 사후 통계를 정확히 만드는 것보다 "
+           "임가에게 실질적인 도움이 됩니다.")
+
+    H2(doc, "라. 기대효과")
     TABLE(doc, [
         ["대상", "기대효과"],
         ["임가", "투자 전 수익 구간 확인 → 과잉 투자 방지 / 임목 갱신·출하 시기 판단 근거 확보"],
@@ -589,12 +701,12 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
         ["연구자", "전 과정 재현 가능한 코드 공개 → 후속 연구 기반"],
     ], widths=[3.0, 13.4])
 
-    H2(doc, "라. 확장 계획")
+    H2(doc, "마. 확장 계획")
     BUL(doc, "미확보 통계 3종(임산물소득조사·산림산업조사·산림휴양복지활동조사) 추가 결합")
     BUL(doc, "임가경제조사 세부 파일 결합으로 Model A 설명력 보강")
     BUL(doc, "산림경영지도원 현장 상담 도구로 배포")
 
-    H2(doc, "마. 재현성 및 별첨")
+    H2(doc, "바. 재현성 및 별첨")
     P(doc, "본 과제의 모든 결과는 코드로 재현됩니다. seed는 42로 고정했고, 전처리부터 학습·평가·"
            "산출물 생성까지 스크립트로 구성했습니다. **요강에 따라 소스코드 전체를 분량 외 별첨으로 "
            "제출합니다.**")
@@ -609,7 +721,7 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
         ["서비스", "api/ (FastAPI), web/ (Vue 3)"],
     ], widths=[2.4, 14.0])
 
-    H2(doc, "바. 이 분석에서 지킨 원칙")
+    H2(doc, "사. 이 분석에서 지킨 원칙")
     NOTE(doc, "① **성능보다 정직을 택했습니다.** Model B의 R²를 0.91에서 0.62로 내린 것이 "
               "이 프로젝트에서 가장 중요한 결정이었습니다.\n"
               "② **한계를 감추지 않았습니다.** 기상 결합 실패, Model A의 낮은 설명력, "

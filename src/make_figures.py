@@ -107,7 +107,7 @@ def fig_benchmark():
         ax.set_ylabel("Test R²")
         ax.set_title(f"{title}\n{sub}", fontsize=11, pad=11)
         bare(ax)
-    fig.suptitle("[그림 1] 동일 분할·동일 지표에서의 3종 모델 비교", fontsize=12.5,
+    fig.suptitle("동일 분할·동일 지표에서의 3종 모델 비교", fontsize=12.5,
                  fontweight="bold", y=1.045)
     save(fig, "fig01_benchmark.png")
 
@@ -143,7 +143,7 @@ def fig_leakage():
     ax.invert_yaxis()
     bare(ax, grid="x")
 
-    fig.suptitle("[그림 2] 데이터 누수(Leakage) 자체 적발 및 교정 경위", fontsize=12.5,
+    fig.suptitle("데이터 누수(Leakage) 자체 적발 및 교정 경위", fontsize=12.5,
                  fontweight="bold", y=1.045)
     save(fig, "fig02_leakage.png")
 
@@ -165,7 +165,7 @@ def fig_coverage():
     ax.set_ylabel("실측값이 P10~P90 안에 든 비율")
     ax.set_xlim(-0.6, 1.9)
     bare(ax)
-    ax.set_title("[그림 3] 분위수 회귀 예측구간의 실제 포함률\n"
+    ax.set_title("분위수 회귀 예측구간의 실제 포함률\n"
                  "점추정만 제시하면 잡음이 큰 ROI를 확정값처럼 오독하기 쉽다",
                  fontsize=11.5, fontweight="bold", pad=12)
     save(fig, "fig03_coverage.png")
@@ -208,7 +208,7 @@ def fig_portfolio():
     ax.set_ylabel("기대 수익률 (%)")
     ax.legend(frameon=False, fontsize=9.5, loc="lower right")
     bare(ax, grid="both")
-    ax.set_title("[그림 4] 작목 조합의 위험–수익 지도 (평균–분산 접근)",
+    ax.set_title("작목 조합의 위험–수익 지도 (평균–분산 접근)",
                  fontsize=11.5, fontweight="bold", pad=11)
     save(fig, "fig04_portfolio.png")
 
@@ -234,7 +234,7 @@ def fig_risk_split():
     ax.legend(frameon=False, fontsize=9.5)
     bare(ax)
     ratio = p["최고효율"]["임가격차_pct"] / p["최고효율"]["연도변동_pct"]
-    ax.set_title(f"[그림 5] 수익 분산의 원천 분해 — 임가 효과가 연도 효과의 {ratio:.0f}배\n"
+    ax.set_title(f"수익 분산의 원천 분해 — 임가 효과가 연도 효과의 {ratio:.0f}배\n"
                  "'무엇을 심을까'보다 '어떻게 할까'가 훨씬 크게 작용한다",
                  fontsize=11.5, fontweight="bold", pad=11)
     save(fig, "fig05_risk_split.png")
@@ -275,7 +275,7 @@ def fig_insight():
     ax.set_title("수령 구간별 수익성 — 갱신 판단 근거", fontsize=10.5, pad=10)
     bare(ax)
 
-    fig.suptitle("[그림 6] 품질 관리·임목 갱신의 수익 기여 (임산물생산비조사)",
+    fig.suptitle("품질 관리·임목 갱신의 수익 기여 (임산물생산비조사)",
                  fontsize=12.5, fontweight="bold", y=1.045)
     save(fig, "fig06_insight.png")
 
@@ -331,7 +331,7 @@ def fig_pipeline():
     arrow(12, 21, 12, 16.4)         # 2행 끝에서 3행으로 꺾임
     arrow(47, 9, 52, 9)
 
-    ax.set_title("[그림 7] 분석 파이프라인 전 과정", fontsize=12.5,
+    ax.set_title("분석 파이프라인 전 과정", fontsize=12.5,
                  fontweight="bold", y=1.0)
     save(fig, "fig07_pipeline.png")
 
@@ -363,9 +363,202 @@ def fig_data():
                        Patch(color=SKY, label="공공데이터 융복합")],
               frameon=False, fontsize=9.5, loc="lower right")
     bare(ax, grid="x")
-    ax.set_title("[그림 8] 활용 데이터 구성 — 임업통계 4종 + 공공데이터 3종",
+    ax.set_title("활용 데이터 구성 — 임업통계 4종 + 공공데이터 3종",
                  fontsize=11.5, fontweight="bold", pad=11)
     save(fig, "fig08_data.png")
+
+
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# 추가 도표 — 본문을 읽어 나가는 동안 눈이 쉬어 갈 곳을 만든다
+# ══════════════════════════════════════════════════════════════════════════
+
+# ── 그림 9. ROI 분포 — 평균이 대표값이 아니다 ─────────────────────────────
+def fig_distribution():
+    import pandas as pd
+    df = pd.read_parquet(os.path.join(ROOT, "data", "processed_forestry_data.parquet"))
+    roi = df["ROI"].dropna()
+    roi = roi[(roi > -200) & (roi < 900)]
+
+    fig, ax = plt.subplots(figsize=(9.2, 3.9))
+    ax.hist(roi, bins=70, color=mixhex(FOREST, 0.72), edgecolor="white", linewidth=0.4, zorder=3)
+    mean, med = roi.mean(), roi.median()
+    for v, c, lab, off in [(mean, ROSE, f"평균 {mean:.0f}%", 14), (med, SKY, f"중앙값 {med:.0f}%", -68)]:
+        ax.axvline(v, color=c, lw=2, ls="--", zorder=4)
+        ax.annotate(lab, (v, ax.get_ylim()[1] * 0.86), xytext=(off, 0),
+                    textcoords="offset points", color=c, fontsize=10.5, fontweight="bold")
+    lo, hi = roi.quantile(0.1), roi.quantile(0.9)
+    ax.axvspan(lo, hi, color=AMBER, alpha=0.08, zorder=1)
+    ax.annotate(f"임가의 80%가 이 사이\n{lo:.0f}% ~ {hi:.0f}%",
+                ((lo + hi) / 2, ax.get_ylim()[1] * 0.55), ha="center", fontsize=9.5,
+                color="#8a5300", zorder=5)
+    ax.set_xlabel("ROI (임업소득 ÷ 임업경영비, %)")
+    ax.set_ylabel("임가 수")
+    bare(ax)
+    ax.set_title("임가 ROI 분포 — 평균은 대표값이 아니다\n"
+                 "표준편차(216.7%p)가 평균(155.5%)보다 크다. "
+                 "'평균 155%'를 그대로 전달하면 임가는 이를 보장값으로 읽는다",
+                 fontsize=11.5, fontweight="bold", pad=12, loc="left")
+    save(fig, "fig09_distribution.png")
+
+
+def mixhex(hex_color, alpha):
+    """흰 바탕과 섞어 옅은 색을 만든다 (인쇄에서 투명도는 신뢰할 수 없다)."""
+    h = hex_color.lstrip("#")
+    r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+    f = lambda c: int(c * alpha + 255 * (1 - alpha))  # noqa: E731
+    return f"#{f(r):02x}{f(g):02x}{f(b):02x}"
+
+
+# ── 그림 10. 품목별 성능 — 잘 안 되는 곳도 그대로 ─────────────────────────
+def fig_per_item():
+    b = J("metrics_cost.json")
+    rows = sorted(b["per_item_test"].items(), key=lambda kv: -kv[1]["R2"])
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(10.4, 3.7),
+                                  gridspec_kw={"width_ratios": [1.5, 1]})
+
+    names = [k for k, _ in rows]
+    r2 = [v["R2"] for _, v in rows]
+    cols = [FOREST if v > 0.3 else (AMBER if v > 0 else ROSE) for v in r2]
+    bars = ax.bar(names, r2, color=cols, width=0.5, zorder=3)
+    for bar, v in zip(bars, r2):
+        ax.text(bar.get_x() + bar.get_width() / 2, v + (0.03 if v >= 0 else -0.07),
+                f"{v:.3f}", ha="center", fontsize=10, fontweight="bold",
+                va="bottom" if v >= 0 else "top")
+    ax.axhline(0, color="#8b969c", lw=1)
+    ax.set_ylim(-0.16, 0.78)
+    ax.set_ylabel("Test R²")
+    ax.set_title("품목별 예측 성능", fontsize=10.5, pad=9, loc="left")
+    bare(ax)
+
+    n = [v["n"] for _, v in rows]
+    b2 = ax2.barh(names[::-1], n[::-1], color=GREY, height=0.5, zorder=3)
+    for bar, v in zip(b2, n[::-1]):
+        ax2.text(v + 4, bar.get_y() + bar.get_height() / 2, f"{v}건",
+                 va="center", fontsize=9.5)
+    ax2.set_xlim(0, max(n) * 1.28)
+    ax2.set_title("테스트셋 표본 수", fontsize=10.5, pad=9, loc="left")
+    bare(ax2, grid="x")
+
+    fig.suptitle("품목별 성능은 표본 수를 그대로 따라간다 — 잘 안 되는 품목도 감추지 않았다",
+                 fontsize=11.5, fontweight="bold", y=1.03, x=0.008, ha="left")
+    save(fig, "fig10_per_item.png")
+
+
+# ── 그림 11. 지역×품목 수익성 히트맵 ──────────────────────────────────────
+def fig_heatmap():
+    m = J("insights.json")["지역x품목"]["matrix"]
+    items = list(m.keys())
+    regions = sorted({r for it in items for r in m[it]})
+    grid = np.array([[m[it].get(r) if m[it].get(r) is not None else np.nan
+                      for it in items] for r in regions], dtype=float)
+
+    fig, ax = plt.subplots(figsize=(8.0, 4.2))
+    from matplotlib.colors import LinearSegmentedColormap
+    cmap = LinearSegmentedColormap.from_list("roi", ["#f4dbe0", "#f7f6f2", "#bcdcc9", FOREST])
+    cmap.set_bad("#f2f4f5")
+    im = ax.imshow(grid, cmap=cmap, aspect="auto")
+    ax.set_xticks(range(len(items))); ax.set_xticklabels(items)
+    ax.set_yticks(range(len(regions))); ax.set_yticklabels(regions)
+    for i in range(len(regions)):
+        for j in range(len(items)):
+            v = grid[i, j]
+            if np.isnan(v):
+                continue
+            ax.text(j, i, f"{v:.0f}", ha="center", va="center", fontsize=9,
+                    color="white" if v > 130 else "#22292d",
+                    fontweight="bold" if v > 130 else "normal")
+    ax.set_xticks(np.arange(-.5, len(items), 1), minor=True)
+    ax.set_yticks(np.arange(-.5, len(regions), 1), minor=True)
+    ax.grid(which="minor", color="white", linewidth=2)
+    ax.tick_params(which="minor", length=0)
+    for s in ax.spines.values():
+        s.set_visible(False)
+    ax.tick_params(length=0)
+    cb = fig.colorbar(im, ax=ax, shrink=0.72, pad=0.02)
+    cb.set_label("ROI 중앙값 (%)", fontsize=9.5)
+    cb.outline.set_visible(False)
+    ax.set_title("어느 지역에서 무엇이 잘 되는가 — 지역×품목 수익성\n"
+                 "조사 임가 15곳 이상인 조합만 표시. 회색은 자료가 적어 판단할 수 없는 칸",
+                 fontsize=11.5, fontweight="bold", pad=12, loc="left")
+    save(fig, "fig11_heatmap.png")
+
+
+# ── 그림 12. 사례 연구 — SHAP 분해와 반사실 처방 ──────────────────────────
+CASE_SHAP = [("경영비", -63.53), ("임지 규모", -41.53), ("작목", 31.09),
+             ("전업 여부", 22.05), ("지역", 15.38), ("기준 연도", -11.98),
+             ("경영주 연세", 6.03), ("일손", 3.56), ("재산", -2.56)]
+CASE_BASE, CASE_PRED = 152.71, 111.04
+CASE_CF = [(1500, 111.0), (900, 170.7), (750, 195.9), (600, 190.7)]
+
+
+def fig_case():
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(10.6, 4.0),
+                                  gridspec_kw={"width_ratios": [1.15, 1]})
+
+    rows = sorted(CASE_SHAP, key=lambda r: abs(r[1]))
+    vals = [r[1] for r in rows]
+    cols = [FOREST if v >= 0 else ROSE for v in vals]
+    bars = ax.barh([r[0] for r in rows], vals, color=cols, height=0.62, zorder=3)
+    for bar, v in zip(bars, vals):
+        ax.text(v + (2.5 if v >= 0 else -2.5), bar.get_y() + bar.get_height() / 2,
+                f"{v:+.1f}", va="center", ha="left" if v >= 0 else "right",
+                fontsize=9.5, fontweight="bold")
+    ax.axvline(0, color="#8b969c", lw=1)
+    ax.set_xlim(-82, 48)
+    ax.set_xlabel("예측 ROI에 대한 기여 (%p)")
+    ax.set_title(f"① 왜 이 숫자인가 — 전체 평균 {CASE_BASE:.0f}% → 이 임가 {CASE_PRED:.0f}%",
+                 fontsize=10.3, pad=9, loc="left")
+    bare(ax, grid="x")
+
+    x = [c[0] for c in CASE_CF]
+    y = [c[1] for c in CASE_CF]
+    order = np.argsort(x)
+    ax2.plot(np.array(x)[order], np.array(y)[order], marker="o", ms=7, lw=2.6,
+             color=FOREST, mfc="white", mec=FOREST, mew=2, zorder=4)
+    ax2.axhline(152.3, color=AMBER, ls="--", lw=1.8, zorder=3)
+    ax2.text(600, 152.3, "같은 조건 임가의 중앙값 152%", color=AMBER, fontsize=9,
+             va="bottom", ha="left", fontweight="bold")
+    ax2.scatter([1500], [111.0], s=140, color=ROSE, zorder=5, edgecolor="white", lw=1.6)
+    ax2.annotate("지금", (1500, 111.0), xytext=(-12, 10), textcoords="offset points",
+                 fontsize=9.5, color=ROSE, fontweight="bold", ha="right")
+    ax2.scatter([750], [195.9], s=180, marker="*", color=FOREST, zorder=5,
+                edgecolor="white", lw=1.2)
+    ax2.annotate("권고 지점", (750, 195.9), xytext=(12, -6), textcoords="offset points",
+                 fontsize=9.5, color=FOREST, fontweight="bold")
+    ax2.set_ylim(98, 212)
+    ax2.set_xlabel("한 해 임업경영비 (만원)")
+    ax2.set_ylabel("예측 ROI (%)")
+    ax2.set_title("② 무엇을 바꾸면 되는가 — 반사실 탐색", fontsize=10.3, pad=9, loc="left")
+    bare(ax2, grid="both")
+
+    fig.suptitle("사례 — 충남 5~10ha 밤 재배 임가(60대, 임업주업, 경영비 1,500만원)",
+                 fontsize=11.5, fontweight="bold", y=1.035, x=0.008, ha="left")
+    save(fig, "fig12_case.png")
+
+
+# ── 그림 13. 지역 단가 프리미엄 ───────────────────────────────────────────
+def fig_premium():
+    d = J("production_insights.json")["지역단가프리미엄"]["밤"]
+    rows = sorted(d["지역"], key=lambda r: r["전국대비_pct"])[-9:]
+    fig, ax = plt.subplots(figsize=(8.4, 3.8))
+    vals = [r["전국대비_pct"] for r in rows]
+    cols = [FOREST if v >= 0 else ROSE for v in vals]
+    bars = ax.barh([r["시도"] for r in rows], vals, color=cols, height=0.6, zorder=3)
+    for bar, r in zip(bars, rows):
+        v = r["전국대비_pct"]
+        ax.text(v + (1.2 if v >= 0 else -1.2), bar.get_y() + bar.get_height() / 2,
+                f"{v:+.1f}%  ({r['가중평균단가']:,.0f}원/kg)",
+                va="center", ha="left" if v >= 0 else "right", fontsize=9.3)
+    ax.axvline(0, color="#8b969c", lw=1)
+    ax.set_xlim(min(vals) - 10, max(vals) + 22)
+    ax.set_xlabel(f"전국 가중평균단가({d['전국_가중평균단가']:,.0f}원/kg) 대비 (%)")
+    bare(ax, grid="x")
+    ax.set_title(f"같은 밤이라도 지역에 따라 kg당 값이 다르다 ({d['연도']}년)\n"
+                 "임산물생산조사 시군구 단위 집계 — 출하처 선택과 물류 판단의 근거",
+                 fontsize=11.5, fontweight="bold", pad=12, loc="left")
+    save(fig, "fig13_premium.png")
 
 
 if __name__ == "__main__":
@@ -378,4 +571,9 @@ if __name__ == "__main__":
     fig_insight()
     fig_pipeline()
     fig_data()
+    fig_distribution()
+    fig_per_item()
+    fig_heatmap()
+    fig_case()
+    fig_premium()
     print(f"→ {OUT}")
