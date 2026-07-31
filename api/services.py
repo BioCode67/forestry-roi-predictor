@@ -184,6 +184,120 @@ def _has_panel(vals: dict) -> bool:
             and reg.get("schema_panel") is not None)
 
 
+@lru_cache(maxsize=1)
+def _fast_plan_a():
+    """한 행짜리 예측을 pandas 없이 하기 위한 준비물.
+
+    프로파일을 떠 보니 예측 한 번에 46ms가 드는데 그중 30ms가 1행짜리 DataFrame을
+    만들고 다루는 비용이었습니다. 나무 445그루를 타는 일보다 표를 만드는 일이
+    더 비쌌던 셈입니다. 무료 등급의 느린 CPU에서는 이 차이가 6초와 2초를 가릅니다.
+
+    범주형은 학습 때 정해진 범주 목록에서의 위치(코드)를 그대로 넘기고, DMatrix에
+    feature_types로 어느 열이 범주형인지 알려 줍니다. pandas를 거칠 때와 같은 값이
+    들어가야 하므로, 아래 _verify_fast_a()로 두 경로가 같은 답을 내는지 확인합니다.
+    """
+    schema = registry()["schema_a"]
+    feats = schema["features"]
+    cats = set(schema["categorical"])
+    # 범주 값 → 코드. 학습 때 pd.Categorical(categories=...)가 매긴 것과 같은 순서.
+    code = {c: {v: i for i, v in enumerate(schema["categories"][c])} for c in cats}
+    ftypes = ["c" if f in cats else "q" for f in feats]
+    return feats, cats, code, ftypes
+
+
+def _fast_row_a(vals: dict) -> np.ndarray:
+    """파생변수까지 손으로 계산해 한 줄짜리 배열을 만듭니다.
+
+    add_derived_features()와 규칙이 어긋나면 조용히 다른 값을 예측하게 됩니다.
+    그래서 여기 계산은 그 함수를 한 줄씩 옮긴 것이고, 정말 같은지는 기동할 때
+    실제 표본으로 맞춰 봅니다(_fast_ok_a).
+    """
+    from preprocess import AGE_MIDPOINT, HA_MIDPOINT, MEMBERS_MIDPOINT
+
+    feats, cats, code, _ = _fast_plan_a()
+    nan = float("nan")
+
+    def num(k):
+        v = vals.get(k)
+        return nan if v is None else float(v)
+
+    cost, off = num("임업경영비"), num("임업외소득")
+    cap_raw = num("기초_자본(순재산)")
+    cap = nan if cap_raw == 0 else cap_raw          # replace(0, nan)
+    ha = HA_MIDPOINT.get(vals.get("임지규모별"), nan)
+    fam = MEMBERS_MIDPOINT.get(vals.get("가구원수별"), nan)
+    age = AGE_MIDPOINT.get(vals.get("연령별"), nan)
+
+    ha_cost = cost / ha if ha == ha else nan
+    denom = abs(off) + abs(cost)
+    reg_x = vals.get("지역별")
+    sec_x = vals.get("업종별")
+
+    d = {
+        "임업경영비": cost, "임업외소득": off, "기초_자본(순재산)": cap_raw,
+        "연초보유": num("연초보유"), "조사연도": num("조사연도"),
+        "임지규모_ha": ha, "가구원수_명": fam, "경영주_연령": age,
+        "log_임업경영비": float(np.log1p(max(cost, 0.0))) if cost == cost else nan,
+        "경영비_자본비율": cost / cap if cap == cap else nan,
+        "ha당_경영비": ha_cost,
+        "log_ha당_경영비": (float(np.log1p(max(ha_cost, 0.0)))
+                        if ha_cost == ha_cost else nan),
+        "ha당_가용노동력": fam / ha if ha == ha else nan,
+        "ha당_자본": cap_raw / ha if ha == ha else nan,
+        "임업외소득_비중": off / denom if denom else nan,
+        "지역x업종": (float(reg_x) * 10 + float(sec_x)
+                  if reg_x is not None and sec_x is not None else nan),
+    }
+
+    row = np.empty(len(feats), dtype="float32")
+    for i, f in enumerate(feats):
+        if f in cats:
+            c = code[f].get(vals.get(f))
+            row[i] = nan if c is None else c
+        else:
+            v = d.get(f, vals.get(f))
+            row[i] = nan if v is None else float(v)
+    return row.reshape(1, -1)
+
+
+def _dmatrix_a(vals: dict):
+    _, _, _, ftypes = _fast_plan_a()
+    return xgb.DMatrix(_fast_row_a(vals), feature_names=_fast_plan_a()[0],
+                       feature_types=ftypes, enable_categorical=True)
+
+
+@lru_cache(maxsize=1)
+def _fast_ok_a() -> bool:
+    """빠른 경로가 pandas 경로와 같은 답을 내는지 확인합니다.
+
+    두 경로가 갈라지면 화면은 멀쩡한데 숫자만 조용히 달라집니다. 겉으로 드러나지
+    않는 종류의 고장이라, 쓰기 전에 직접 맞춰 봅니다. 한 번이라도 어긋나면
+    빠른 경로를 버리고 pandas 쪽으로 돌아갑니다.
+    """
+    reg = registry()
+    df = reg["df_a"]
+    if df is None or reg["model_a"] is None:
+        return False
+    try:
+        schema = reg["schema_a"]
+        rng = np.random.default_rng(0)
+        idx = rng.choice(len(df), size=min(40, len(df)), replace=False)
+        for i in idx:
+            r = df.iloc[int(i)]
+            vals = {k: (None if pd.isna(r.get(k)) else r.get(k))
+                    for k in ("연령별", "지역별", "전/겸업별", "업종별", "가구원수별",
+                              "임지규모별", "임업경영비", "임업외소득",
+                              "기초_자본(순재산)", "연초보유", "조사연도")}
+            slow = reg["model_a"].predict(
+                xgb.DMatrix(build_row_a(vals, schema), enable_categorical=True))[0]
+            fast = reg["model_a"].predict(_dmatrix_a(vals))[0]
+            if abs(float(slow) - float(fast)) > 1e-3:
+                return False
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def predict_a(vals: dict) -> dict:
     reg = registry()
     if reg["model_a"] is None:
@@ -201,15 +315,20 @@ def predict_a(vals: dict) -> dict:
             used = "기본"
 
     schema = reg["schema_a"]
-    X = build_row_a(vals, schema)
     kind = schema.get("target_transform", "none")
+    # 빠른 경로가 pandas 경로와 같은 답을 낸다고 확인된 경우에만 씁니다.
+    # 확인은 기동 때 한 번, 실제 표본으로 맞춰 봅니다.
+    if _fast_ok_a():
+        d = _dmatrix_a(vals)
+    else:
+        d = xgb.DMatrix(build_row_a(vals, schema), enable_categorical=True)
+
     if used == "기본":
-        roi = float(inv_transform(
-            reg["model_a"].predict(xgb.DMatrix(X, enable_categorical=True))[0], kind))
+        roi = float(inv_transform(reg["model_a"].predict(d)[0], kind))
 
     band = None
     if reg["quantile_a"] is not None:
-        pred = reg["quantile_a"].predict(xgb.DMatrix(X, enable_categorical=True))
+        pred = reg["quantile_a"].predict(d)
         pred = np.sort(np.atleast_2d(pred), axis=1)[0]
         band = [float(inv_transform(v, "none")) for v in pred]
 
