@@ -85,6 +85,31 @@ def load_cost_data():
     return pd.read_parquet(p) if os.path.exists(p) else None
 
 
+@st.cache_resource(show_spinner=False)
+def load_quantile(key: str):
+    """분위수 회귀 모델 (P10/P50/P90). 없으면 None."""
+    p = os.path.join(MODEL_DIR, f"quantile_{key}.json")
+    mp = os.path.join(MODEL_DIR, "metrics_quantile.json")
+    if not (os.path.exists(p) and os.path.exists(mp)):
+        return None, None
+    b = xgb.Booster()
+    b.load_model(p)
+    b.set_param({"device": "cpu"})
+    with open(mp, encoding="utf-8") as f:
+        m = json.load(f)
+    return b, m.get(key)
+
+
+def predict_band(booster, X, transform="none"):
+    """P10 / P50 / P90 예측. 분위수 교차를 막기 위해 행별로 정렬한다."""
+    pred = booster.predict(xgb.DMatrix(X, enable_categorical=True))
+    pred = np.atleast_2d(pred)
+    if pred.shape[0] == 1 and pred.shape[1] != 3:
+        pred = pred.reshape(-1, 1)
+    pred = np.sort(pred, axis=1)[0]
+    return tuple(float(inv_transform(v, transform)) for v in pred)
+
+
 @st.cache_data(show_spinner=False)
 def load_production():
     p = os.path.join(MODEL_DIR, "production_insights.json")
@@ -229,12 +254,27 @@ if df is not None:
         g = df[df["업종별"] == v_sector]["ROI"]
     base_roi = float(g.mean()) if len(g) else float(df["ROI"].mean())
 
+qbst, qmeta = load_quantile("roi")
+band = predict_band(qbst, X, schema.get("target_transform", "none")) if qbst else None
+
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("예측 임업 ROI", f"{roi:,.1f} %",
           delta=f"{roi - base_roi:+.1f}%p vs 지역·업종 평균" if np.isfinite(base_roi) else None)
 c2.metric("예상 임업소득", f"{est_income:,.0f} 원")
 c3.metric("예상 임업총수입", f"{est_revenue:,.0f} 원")
 c4.metric("투입 임업경영비", f"{v_cost:,.0f} 원")
+
+if band:
+    p10, p50, p90 = band
+    cov = (qmeta or {}).get("coverage_80pct")
+    st.warning(
+        f"**예측구간 (P10~P90)** — ROI **{p10:,.0f}% ~ {p90:,.0f}%** "
+        f"(중앙값 {p50:,.0f}%), 임업소득으로는 "
+        f"**{p10/100*v_cost:,.0f}원 ~ {p90/100*v_cost:,.0f}원**입니다.\n\n"
+        "임가 ROI는 기상·병충해·시장가격 등 조사되지 않는 요인의 영향을 크게 받습니다. "
+        "위 점추정은 확정값이 아니라 분포의 중심이며, 실제 성과는 이 구간 안에서 움직일 "
+        + (f"가능성이 약 80%입니다 (검증셋 실측 포함률 {cov*100:.0f}%)." if cov else "가능성이 높습니다.")
+    )
 
 if np.isfinite(base_roi):
     gap = est_income - base_roi / 100.0 * v_cost
