@@ -4,6 +4,7 @@ import EChart from '../components/EChart.vue'
 import MetricCard from '../components/MetricCard.vue'
 import SectionHead from '../components/SectionHead.vue'
 import PageHero from '../components/PageHero.vue'
+import StatStrip from '../components/StatStrip.vue'
 import { fmt } from '../lib/api'
 import { axisX, axisY, baseOption, palette, theme } from '../lib/charts'
 
@@ -13,6 +14,22 @@ const tab = ref('a')
 const bench = computed(() =>
   tab.value === 'a' ? meta.value?.benchmark_a : meta.value?.benchmark_b)
 const q = computed(() => meta.value?.quantile?.[tab.value === 'a' ? 'roi' : 'cost'])
+
+const strip = computed(() => {
+  const b = bench.value
+  if (!b?.rows?.length) return []
+  const last = b.rows.at(-1), base = b.rows[0]
+  return [
+    { label: '제안 모델 정확도 (R²)', value: fmt.dec(last.R2, 3),
+      note: `기존 방식 ${fmt.dec(base.R2, 3)}` },
+    b.improvement && { label: '기존 방식 대비', value: fmt.dec(b.improvement.R2_ratio ?? 0, 1),
+      unit: '배', note: '설명력 기준' },
+    b.improvement && { label: '오차 감소 (MAE)',
+      value: fmt.dec(b.improvement.MAE_reduction_pct, 0), unit: '%' },
+    b.dataset && { label: '학습 표본', value: fmt.int(b.dataset.rows), unit: '건',
+      note: `설명변수 ${b.dataset.n_features}개` },
+  ].filter(Boolean)
+})
 
 const METRICS = [
   { key: 'R2', label: 'R²', hint: '↑ 높을수록 우수', dec: 4 },
@@ -77,7 +94,9 @@ const importanceOption = computed(() => {
       lead="현행 산림청 공표 방식(단순 그룹 평균)을 같은 평가셋에서 예측기로 세워 비교했습니다. 학습에 한 번도 쓰이지 않은 자료로 산출한 값입니다."
     />
 
-  <main class="content">
+    <StatStrip :items="strip" />
+
+  <main class="content" style="padding-top:6px">
     <div class="container">
 
       <div class="tabs">

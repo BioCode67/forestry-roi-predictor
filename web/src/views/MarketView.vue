@@ -4,6 +4,7 @@ import EChart from '../components/EChart.vue'
 import MetricCard from '../components/MetricCard.vue'
 import SectionHead from '../components/SectionHead.vue'
 import PageHero from '../components/PageHero.vue'
+import StatStrip from '../components/StatStrip.vue'
 import PageHead from '../components/PageHead.vue'
 import DataState from '../components/DataState.vue'
 import { api, fmt } from '../lib/api'
@@ -24,6 +25,22 @@ const items = computed(() => {
   return Object.keys(prod.value.단가추이).filter((k) => prod.value.지역단가프리미엄[k])
 })
 watch(items, (l) => { if (l.length && !l.includes(picked.value)) picked.value = l[0] })
+
+const strip = computed(() => {
+  if (!prod.value) return []
+  const t = prod.value.단가추이, p2 = prod.value.지역단가프리미엄
+  const rise = Object.entries(t).filter(([k]) => p2[k])
+    .sort((a, b) => b[1].단가_변화율_pct - a[1].단가_변화율_pct)[0]
+  const gap = Object.entries(p2).sort((a, b) => b[1].지역격차_배 - a[1].지역격차_배)[0]
+  return [
+    { label: '조사 기간', value: `${prod.value.연도[0]}~${prod.value.연도.at(-1)}`, note: '전국 시·군 실측' },
+    { label: '조사 건수', value: fmt.int(prod.value.관측), unit: '건', note: `${prod.value.품목수}개 품목` },
+    rise && { label: '값이 가장 많이 오른 작물', value: rise[0],
+      unit: ` ${fmt.signed(rise[1].단가_변화율_pct, 0)}%`, note: '첫 해 대비' },
+    gap && { label: '지역 차이가 가장 큰 작물', value: gap[0],
+      unit: ` ${fmt.dec(gap[1].지역격차_배, 1)}배`, note: `${gap[1].최고지역} vs ${gap[1].최저지역}` },
+  ].filter(Boolean)
+})
 
 const trend = computed(() => prod.value?.단가추이?.[picked.value])
 const prem = computed(() => prod.value?.지역단가프리미엄?.[picked.value])
@@ -137,7 +154,9 @@ const allTrendOption = computed(() => {
       lead="전국 시·군마다 실제로 얼마에 팔렸는지 조사한 자료입니다. 같은 작물이라도 지역마다 받는 값이 꽤 다릅니다."
     />
 
-  <main class="content">
+    <StatStrip :items="strip" />
+
+  <main class="content" style="padding-top:6px">
     <div class="container">
 
       <DataState :loading="loading" :error="error">

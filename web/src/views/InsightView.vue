@@ -4,6 +4,7 @@ import EChart from '../components/EChart.vue'
 import MetricCard from '../components/MetricCard.vue'
 import SectionHead from '../components/SectionHead.vue'
 import PageHero from '../components/PageHero.vue'
+import StatStrip from '../components/StatStrip.vue'
 import PageHead from '../components/PageHead.vue'
 import DataState from '../components/DataState.vue'
 import { api, fmt } from '../lib/api'
@@ -24,6 +25,25 @@ const gradeItems = computed(() => Object.keys(ins.value?.등급별_단가 || {})
 const leaderItems = computed(() => Object.keys(ins.value?.선도임가_격차 || {}))
 watch(gradeItems, (l) => { if (l.length && !l.includes(gradeItem.value)) gradeItem.value = l[0] })
 watch(leaderItems, (l) => { if (l.length && !l.includes(leaderItem.value)) leaderItem.value = l[0] })
+
+const strip = computed(() => {
+  if (!ins.value) return []
+  const g = ins.value.등급별_단가?.밤
+  const sim = ins.value.등급전환_시뮬레이션?.밤
+  const ages = ins.value.수령별_수익성 || {}
+  const first = Object.entries(ages)[0]
+  const lead = ins.value.선도임가_격차?.밤
+  return [
+    g && { label: '밤 등급 간 값 차이', value: fmt.dec(g.최고_최저_단가배수, 1), unit: '배',
+      note: `${g.등급[0].구분} ${fmt.int(g.등급[0].단가_원per단위수량)}원` },
+    sim && { label: '선별만 잘해도', value: fmt.won(sim.수취액_증가_원per단위면적),
+      note: 'ha당 수취액 증가' },
+    first && { label: `${first[0]} 가장 잘 버는 나이`, value: first[1].최고구간,
+      note: `${fmt.dec(first[1].최고ROI, 0)}%` },
+    lead && { label: '잘하는 농가 표본', value: fmt.int(lead.표본?.선도임가), unit: '곳',
+      note: '비목 구조 비교 기준' },
+  ].filter(Boolean)
+})
 
 const grade = computed(() => ins.value?.등급별_단가?.[gradeItem.value])
 const sim = computed(() => ins.value?.등급전환_시뮬레이션?.[gradeItem.value])
@@ -160,7 +180,9 @@ const regionOption = computed(() => {
       lead="앞 화면이 “얼마 남을까”였다면 여기는 “무엇을 바꾸면 나아질까”입니다. 등급을 올릴 때, 나무 나이에 따라, 잘하는 농가와 비교했을 때의 차이를 실제 조사 자료로 확인해 보세요."
     />
 
-  <main class="content">
+    <StatStrip :items="strip" />
+
+  <main class="content" style="padding-top:6px">
     <div class="container">
 
       <DataState :loading="loading" :error="error">

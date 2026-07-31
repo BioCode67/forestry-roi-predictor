@@ -4,6 +4,7 @@ import EChart from '../components/EChart.vue'
 import MetricCard from '../components/MetricCard.vue'
 import SectionHead from '../components/SectionHead.vue'
 import PageHero from '../components/PageHero.vue'
+import StatStrip from '../components/StatStrip.vue'
 import PageHead from '../components/PageHead.vue'
 import DataState from '../components/DataState.vue'
 import { api, fmt } from '../lib/api'
@@ -36,6 +37,23 @@ watch(sectorLabel, async (s) => {
     loading.value = false
   }
 }, { immediate: true })
+
+const strip = computed(() => {
+  const e = m.value?.출하시기별_단가
+  const ch = m.value?.판매처별_단가
+  const st = m.value?.저장경험별_단가
+  if (!e && !ch) return []
+  return [
+    e && { label: '값 가장 잘 받는 시기', value: e.최고시기,
+      note: `kg당 ${fmt.int(e.최고단가)}원` },
+    e && { label: '가장 쌀 때와 차이', value: fmt.dec(e.격차_배, 2), unit: '배',
+      note: `${e.최저시기} ${fmt.int(e.최저단가)}원` },
+    ch && { label: '값 더 주는 판매처', value: ch.최고판매처,
+      note: `kg당 ${fmt.int(ch.계열단가[ch.최고판매처])}원` },
+    st && { label: '저장고 쓰는 농가', value: fmt.signed(st.단가차_pct, 0), unit: '%',
+      note: '단가 차이' },
+  ].filter(Boolean)
+})
 
 /* 임업통계 기반 출하시기 단가 */
 const shipOption = computed(() => {
@@ -178,7 +196,9 @@ const kamisCharts = computed(() => {
       lead="같은 물건이라도 파는 시기와 파는 곳에 따라 받는 값이 달라집니다. 전국 농가가 실제로 언제·어디에 팔았고 얼마를 받았는지 조사한 자료로 계산했습니다."
     />
 
-  <main class="content">
+    <StatStrip :items="strip" />
+
+  <main class="content" style="padding-top:6px">
     <div class="container">
 
       <!-- ① 임업통계 기반 -->
