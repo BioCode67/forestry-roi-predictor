@@ -33,10 +33,18 @@ MUTED = RGBColor(0x55, 0x5F, 0x66)
 FOREST = RGBColor(0x1F, 0x5A, 0x38)
 AMBER = RGBColor(0x8A, 0x53, 0x00)
 
-SH_HEAD = "E8EFEA"     # 표 머리
-SH_ALT = "F7F9F8"      # 표 짝수 줄
+# 표 색 — 머리는 진한 초록에 흰 글자, 몸통은 두 단계 옅은 줄무늬.
+# 진하게 쓸 곳을 하나만 두고 나머지는 눌러야 표가 시끄러워지지 않는다.
+SH_HEAD = "23593A"     # 표 머리 (진한 숲색)
+SH_ALT = "F4F8F5"      # 짝수 줄
+SH_ROW = "FFFFFF"      # 홀수 줄
+SH_MARK = "DFEDE4"     # 강조 줄 — 결론이 되는 행
+SH_BEFORE = "FBF2F2"   # 전/후 표의 '전' 칸
+SH_AFTER = "EEF6F0"    # 전/후 표의 '후' 칸
+CL_LINE = "C9D8CF"     # 줄 사이 가로선
 SH_NOTE = "F2F7F4"     # 강조 상자
 SH_WARN = "FDF6EA"
+WHITE = RGBColor(0xFF, 0xFF, 0xFF)
 
 
 # ── 저수준 헬퍼 ────────────────────────────────────────────────────────────
@@ -50,11 +58,37 @@ def _font(run, size=10.5, bold=False, color=INK, name=FONT, ea=None):
 
 
 def _shade(cell_or_par, hex_color):
-    el = cell_or_par._tc if hasattr(cell_or_par, "_tc") else cell_or_par._p.get_or_add_pPr()
+    """칸 또는 문단에 배경색. tcBorders 뒤에 와야 하므로 테두리를 먼저 넣는다."""
+    if hasattr(cell_or_par, "_tc"):
+        el = cell_or_par._tc.get_or_add_tcPr()
+    else:
+        el = cell_or_par._p.get_or_add_pPr()
     sh = OxmlElement("w:shd")
     sh.set(qn("w:val"), "clear")
     sh.set(qn("w:fill"), hex_color)
     el.append(sh)
+
+
+def _cell_lines(cell, top=None, bottom=None):
+    """세로선을 지우고 가로선만 남긴다. 세로 격자가 없으면 숫자가 훨씬 잘 읽힌다.
+
+    top·bottom은 (굵기, 색) 또는 None. OOXML은 tcPr 안에서 tcBorders가 shd보다
+    앞에 와야 하므로 배경색보다 먼저 불러야 한다.
+    """
+    tcPr = cell._tc.get_or_add_tcPr()
+    b = OxmlElement("w:tcBorders")
+    for side, spec in (("top", top), ("left", None), ("bottom", bottom), ("right", None)):
+        e = OxmlElement(f"w:{side}")
+        if spec is None:
+            e.set(qn("w:val"), "nil")
+        else:
+            sz, color = spec
+            e.set(qn("w:val"), "single")
+            e.set(qn("w:sz"), str(sz))
+            e.set(qn("w:space"), "0")
+            e.set(qn("w:color"), color)
+        b.append(e)
+    tcPr.append(b)
 
 
 def _border(par, side="left", color="2E7D4F", sz=18):
@@ -72,16 +106,25 @@ def _border(par, side="left", color="2E7D4F", sz=18):
 BOLD = re.compile(r"\*\*(.+?)\*\*")
 
 
+def _add(par, text, size, bold, color):
+    """줄바꿈을 실제 <w:br>로 넣습니다. run 안의 \n은 워드에서 무시됩니다."""
+    for i, line in enumerate(text.split("\n")):
+        r = par.add_run(line)
+        _font(r, size, bold, color)
+        if i < text.count("\n"):
+            r.add_break()
+
+
 def _rich(par, text, size=10.5, color=INK):
     """**굵게** 표기만 해석합니다. 그 이상은 문서를 어지럽힙니다."""
     pos = 0
     for m in BOLD.finditer(text):
         if m.start() > pos:
-            _font(par.add_run(text[pos:m.start()]), size, False, color)
-        _font(par.add_run(m.group(1)), size, True, color)
+            _add(par, text[pos:m.start()], size, False, color)
+        _add(par, m.group(1), size, True, color)
         pos = m.end()
     if pos < len(text):
-        _font(par.add_run(text[pos:]), size, False, color)
+        _add(par, text[pos:], size, False, color)
 
 
 # ── 문단 API ──────────────────────────────────────────────────────────────
@@ -145,31 +188,63 @@ def CODE(doc, text):
         _shade(p, "F4F6F7")
 
 
-def TABLE(doc, rows, widths=None, align_right=None, size=9.1):
-    """첫 줄을 머리로 보고 음영을 넣습니다. align_right는 우측 정렬할 열 번호."""
+def TABLE(doc, rows, widths=None, align_right=None, size=9.1,
+          mark=None, before_after=False):
+    """표를 그립니다.
+
+    머리줄은 진한 숲색에 흰 글자, 몸통은 두 단계 옅은 줄무늬로 둡니다.
+    세로 격자는 지웁니다. 칸을 사방으로 가두면 숫자가 상자 안에 갇혀 보입니다.
+
+    mark          — 강조할 몸통 줄 번호(머리 제외 0부터). 결론이 되는 행에 씁니다.
+    before_after  — 3열짜리 '활용 전 ⇨ 후' 표. 좌우 칸에 다른 색을 깝니다.
+    """
     align_right = align_right or []
+    mark = set(mark or [])
     t = doc.add_table(rows=len(rows), cols=len(rows[0]))
     t.style = "Table Grid"
     t.alignment = WD_TABLE_ALIGNMENT.CENTER
+    last = len(rows) - 1
+
     for ri, row in enumerate(rows):
+        body = ri - 1                       # 머리줄을 뺀 몸통 번호
         for ci, val in enumerate(row):
             cell = t.cell(ri, ci)
             cell.text = ""
             p = cell.paragraphs[0]
-            p.paragraph_format.space_after = Pt(0.8)
-            p.paragraph_format.space_before = Pt(0.8)
-            p.paragraph_format.line_spacing = 1.12
-            if ci in align_right and ri > 0:
-                p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            elif ri == 0:
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            _rich(p, str(val), size, INK)
+            p.paragraph_format.space_after = Pt(1.2)
+            p.paragraph_format.space_before = Pt(1.2)
+            p.paragraph_format.line_spacing = 1.14
             if ri == 0:
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            elif ci in align_right:
+                p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            elif before_after and ci == 1:
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+            _rich(p, str(val), size, WHITE if ri == 0 else INK)
+
+            # 테두리 → 배경 순서를 지켜야 한컴에서 깨지지 않습니다
+            if ri == 0:
+                _cell_lines(cell, bottom=(12, SH_HEAD))
                 for r in p.runs:
                     r.font.bold = True
                 _shade(cell, SH_HEAD)
-            elif ri % 2 == 0:
-                _shade(cell, SH_ALT)
+            else:
+                _cell_lines(cell,
+                            top=None if ri == 1 else (4, CL_LINE),
+                            bottom=(8, SH_HEAD) if ri == last else None)
+                if before_after:
+                    fill = (SH_BEFORE if ci == 0 else
+                            SH_ROW if ci == 1 else SH_AFTER)
+                elif body in mark:
+                    fill = SH_MARK
+                else:
+                    fill = SH_ALT if body % 2 else SH_ROW
+                if body in mark:
+                    for r in p.runs:
+                        r.font.bold = True
+                _shade(cell, fill)
+
     if widths:
         for ci, w in enumerate(widths):
             for row in t.rows:
@@ -223,8 +298,8 @@ def build():
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.paragraph_format.space_after = Pt(6)
-    _font(p.add_run("임가별 수익률 예측과 처방을 제공하는\n임업 의사결정 지원 시스템"),
-          19, True, FOREST)
+    _add(p, "임가별 수익률 예측과 처방을 제공하는\n임업 의사결정 지원 시스템",
+         19, True, FOREST)
 
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -472,7 +547,7 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
         ["**Optuna XGBoost**", f"**{ax_['R2']:.4f}**", f"**{ax_['RMSE']:.2f}**",
          f"**{bx['R2']:.4f}**", f"**{bx['RMSE']:.2f}**"],
         ["개선 배수", "**×4.05**", "−7.1%", "**×5.95**", "−35.2%"],
-    ], widths=[4.6, 2.9, 3.0, 2.9, 3.0], align_right=[1, 2, 3, 4])
+    ], widths=[4.6, 2.9, 3.0, 2.9, 3.0], align_right=[1, 2, 3, 4], mark=[2, 3])
 
     FIGURE(doc, "fig01_benchmark.png", "[그림 5] 동일 분할·동일 지표에서의 3종 모델 비교", 12.5)
 
@@ -492,7 +567,8 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
         judge = "양호" if v["R2"] > 0.3 else ("제한적" if v["R2"] > 0 else "표본 부족")
         rows.append([k, f"{v['R2']:.4f}", f"{v['RMSE']:.1f}", f"{v['MAE']:.1f}",
                      f"{v['n']}건", judge])
-    TABLE(doc, rows, widths=[2.6, 2.4, 2.4, 2.4, 2.6, 2.8], align_right=[1, 2, 3, 4])
+    TABLE(doc, rows, widths=[2.6, 2.4, 2.4, 2.4, 2.6, 2.8], align_right=[1, 2, 3, 4],
+          mark=[len(rows) - 2])
 
     H2(doc, "나. 결과 ② 패널 구조를 쓰면 설명력이 네 배가 된다")
     P(doc, "임가경제조사가 같은 임가를 여러 해 따라가는 패널이라는 점을 확인하고, "
@@ -505,7 +581,7 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
         lab = f"**{k}**" if k == "패널 변수 추가" else k
         rows.append([lab, f"{gp[k]['R2']:.4f}", f"{gp[k]['RMSE']:.2f}",
                      f"{gp[k]['MAE']:.2f}", f"±{gsd[k]:.4f}"])
-    TABLE(doc, rows, widths=[4.4, 3.0, 2.8, 2.8, 2.8], align_right=[1, 2, 3, 4])
+    TABLE(doc, rows, widths=[4.4, 3.0, 2.8, 2.8, 2.8], align_right=[1, 2, 3, 4], mark=[3])
     P(doc, "같은 부분집합에서 다시 잰 값입니다. **작년 ROI 한 항목을 선형 보정한 것만으로 "
            "R² 0.2548**이 나와, 설명변수 22개를 쓴 기존 모델(0.0635)의 네 배입니다. "
            "패널 변수를 넣은 XGBoost는 0.2798로 **산림청 방식(0.0274) 대비 10.2배**입니다.")
@@ -623,7 +699,8 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
         rows.append([r["품목"], f"{r['기대수익_pct']:.1f}%", f"±{r['연도변동_pct']:.1f}%p",
                      f"±{r['임가격차_pct']:.1f}%p", f"{r['효율']:.2f}",
                      f"{r['표본수']:,}", f"{r['조사연도'][0]}~{r['조사연도'][-1]}"])
-    TABLE(doc, rows, widths=[2.4, 2.4, 2.6, 2.6, 1.8, 2.0, 2.6], align_right=[1, 2, 3, 4, 5])
+    TABLE(doc, rows, widths=[2.4, 2.4, 2.6, 2.6, 1.8, 2.0, 2.6],
+          align_right=[1, 2, 3, 4, 5], mark=[0])
 
     bp = PF["최고효율"]
     P(doc, "**최적 조합** — " + " · ".join(f"{c['품목']} {c['비중_pct']}%" for c in bp["구성"])
@@ -685,7 +762,7 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
         ["단일 작목 수익만 비교", "⇨", "**위험 대비 수익 기준 작목 조합** (효율 +33.3%)"],
         ["마이크로데이터가 연구자 전유물", "⇨", "**웹에서 누구나 즉시 이용**"],
         ["통계 용어 중심 보고서", "⇨", "**임업 종사자의 말로 재작성**"],
-    ], widths=[6.4, 1.0, 9.0])
+    ], widths=[6.4, 1.0, 9.0], before_after=True)
 
     H2(doc, "나. 정책적 시사점")
     P(doc, "**① 조사 설계 개선 근거.** Model A(R² 0.17)와 Model B(R² 0.62)의 격차는 "
