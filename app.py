@@ -120,6 +120,15 @@ def load_production():
 
 
 @st.cache_data(show_spinner=False)
+def load_subsidy():
+    p = os.path.join(MODEL_DIR, "subsidy_programs.json")
+    if not os.path.exists(p):
+        return None
+    with open(p, encoding="utf-8") as f:
+        return json.load(f)
+
+
+@st.cache_data(show_spinner=False)
 def load_management():
     p = os.path.join(MODEL_DIR, "management_insights.json")
     if not os.path.exists(p):
@@ -348,6 +357,51 @@ with tab1:
             )
         else:
             st.success("**경영비 최적화 제안** — 현재 투입 수준이 예측 소득 최대 구간에 근접합니다.")
+
+        # --- 보조사업 활용 시 실효 ROI --------------------------------------
+        subs = load_subsidy()
+        if subs:
+            st.markdown("---")
+            st.subheader("보조사업 활용 시 실효 ROI")
+            st.caption(
+                "예측 ROI는 총 투입액 기준입니다. 보조사업을 활용하면 임가가 실제 부담하는 "
+                "돈은 자부담액뿐이므로, **자기 자금 기준 수익률**은 보조율만큼 지렛대가 걸립니다."
+            )
+            cats = subs["업종별_관련분류"].get(sector_label, list(subs["분류별_요약"]))
+            progs = [p for p in subs["사업목록"]
+                     if p["분류"] in cats and p["자부담비율"] and p["자부담비율"] > 0]
+            if progs:
+                names = [f"{p['사업명']} — 자부담 {p['자부담비율']}%" for p in progs]
+                sel = st.selectbox("보조사업", names, key="subsidy_pick")
+                pr = progs[names.index(sel)]
+                sp = pr["자부담비율"]
+                eff = roi * (100.0 / sp)
+                own = v_cost * sp / 100.0
+
+                s1, s2, s3, s4 = st.columns(4)
+                s1.metric("자부담 비율", f"{sp} %",
+                          delta=f"보조 {pr['보조율']}%", delta_color="off")
+                s2.metric("자부담액", f"{own:,.0f} 원",
+                          delta=f"총 투입 {v_cost:,.0f}원 중", delta_color="off")
+                s3.metric("실효 ROI (자부담 기준)", f"{eff:,.1f} %",
+                          delta=f"{eff - roi:+,.1f}%p vs 총투입 기준")
+                s4.metric("지렛대", f"{pr['지렛대배수']:,.1f} 배")
+
+                comp = pd.DataFrame({
+                    "기준": ["총 투입액 기준", "자부담 기준 (보조사업 활용)"],
+                    "ROI": [roi, eff]})
+                fs = go.Figure(go.Bar(
+                    x=comp["기준"], y=comp["ROI"], marker_color=[GREY, GREEN],
+                    text=[f"{v:,.1f}%" for v in comp["ROI"]], textposition="outside"))
+                fs.update_layout(height=280, yaxis_title="ROI (%)",
+                                 margin=dict(l=10, r=10, t=20, b=10))
+                st.plotly_chart(fs, width="stretch")
+
+                st.warning(
+                    f"**{pr['사업명']}** — 사후관리기간 **{pr['사후관리기간_년']}년**. "
+                    + subs["유의"]
+                )
+                st.caption(subs["기준시점"])
 
     with right:
         st.subheader("동일 조건 임가 분포 내 위치")
