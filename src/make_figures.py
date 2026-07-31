@@ -561,6 +561,96 @@ def fig_premium():
     save(fig, "fig13_premium.png")
 
 
+# ── 그림 14. 패널 구조 활용 — 작년 실적이 가진 힘 ─────────────────────────
+def fig_panel():
+    d = J("metrics_panel.json")
+    g = d["임가단위_5회평균"]
+    sd = d["임가단위_fold표준편차"]
+    order = ["산림청 방식", "기존 22변수", "작년값 선형보정", "패널 변수 추가"]
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(10.6, 3.9),
+                                  gridspec_kw={"width_ratios": [1.25, 1]})
+
+    vals = [g[k]["R2"] for k in order]
+    errs = [sd[k] for k in order]
+    cols = [GREY, GREY, AMBER, FOREST]
+    bars = ax.bar(order, vals, yerr=errs, color=cols, width=0.52, zorder=3,
+                  error_kw=dict(ecolor="#7c878d", capsize=4, lw=1.2))
+    for bar, v, e in zip(bars, vals, errs):
+        ax.text(bar.get_x() + bar.get_width() / 2, v + e + 0.012, f"{v:.4f}",
+                ha="center", fontsize=10.5, fontweight="bold")
+    ax.set_ylim(0, max(vals) * 1.42)
+    ax.set_ylabel("Test R²  (임가 단위 분할 5회 평균)")
+    ax.tick_params(axis="x", labelrotation=8)
+    ax.set_title("① 작년 실적 한 항목이 설명변수 22개보다 많은 것을 설명한다",
+                 fontsize=10.3, pad=9, loc="left")
+    bare(ax)
+
+    yr = d["연도단위"]
+    years = sorted(yr)
+    x = np.arange(len(years))
+    w = 0.26
+    for i, (k, c) in enumerate([("산림청 방식", GREY), ("기존 22변수", SKY),
+                                ("패널 변수 추가", FOREST)]):
+        v = [yr[t][k]["R2"] for t in years]
+        b = ax2.bar(x + (i - 1) * w, v, w, color=c, label=k, zorder=3)
+        for bb, vv in zip(b, v):
+            ax2.text(bb.get_x() + bb.get_width() / 2, vv + 0.008, f"{vv:.2f}",
+                     ha="center", fontsize=8.6)
+    ax2.set_xticks(x)
+    ax2.set_xticklabels([f"{t}년 시험\n(~{int(t)-1} 학습)" for t in years], fontsize=9.5)
+    ax2.set_ylabel("Test R²")
+    ax2.legend(frameon=False, fontsize=8.8, loc="upper left")
+    ax2.set_ylim(0, 0.42)
+    ax2.set_title("② 과거로 배워 미래를 맞히는 조건에서도 앞선다",
+                  fontsize=10.3, pad=9, loc="left")
+    bare(ax2)
+
+    fig.suptitle("패널 구조 활용 — 같은 임가의 작년 실적을 쓰면 예측이 크게 나아진다",
+                 fontsize=11.8, fontweight="bold", y=1.035, x=0.008, ha="left")
+    save(fig, "fig14_panel.png")
+
+
+# ── 그림 15. 분할 감사 ────────────────────────────────────────────────────
+def fig_audit():
+    a = J("audit_split.json")
+    fig, (ax, ax2) = plt.subplots(1, 2, figsize=(10.2, 3.5),
+                                  gridspec_kw={"width_ratios": [1, 1.25]})
+
+    frac = a["행단위_시험셋_임가중복_비율_pct"]
+    ax.barh([""], [frac], color=ROSE, height=0.44, zorder=3)
+    ax.barh([""], [100 - frac], left=[frac], color=mixhex(FOREST, 0.45), height=0.44, zorder=3)
+    ax.text(frac / 2, 0, f"{frac:.1f}%", ha="center", va="center", color="white",
+            fontsize=12, fontweight="bold")
+    ax.text(frac + (100 - frac) / 2, 0, f"{100-frac:.1f}%", ha="center", va="center",
+            fontsize=11, color="#22292d")
+    ax.set_xlim(0, 100)
+    ax.set_yticks([])
+    ax.set_xlabel("시험셋 444행의 구성 (%)")
+    ax.set_title("① 시험셋의 66.9%가 학습셋과 임가를 공유하고 있었다",
+                 fontsize=10.2, pad=9, loc="left")
+    ax.text(0, -0.62, "붉은색: 학습셋에도 있는 임가        연한 초록: 시험셋에만 있는 임가",
+            fontsize=8.8, color="#6b767d", transform=ax.get_yaxis_transform())
+    bare(ax, grid="none")
+
+    row, grp = a["행단위"]["xgboost"]["R2"], a["임가단위_5회평균"]["xgboost"]["R2"]
+    gsd = a["임가단위_5회평균"]["R2_표준편차"]
+    bars = ax2.bar(["행 단위 분할\n(현행)", "임가 단위 분할\n(엄격)"], [row, grp],
+                   yerr=[0, gsd], color=[GREY, FOREST], width=0.44, zorder=3,
+                   error_kw=dict(ecolor="#7c878d", capsize=5, lw=1.2))
+    for bar, v in zip(bars, [row, grp]):
+        ax2.text(bar.get_x() + bar.get_width() / 2, v + gsd + 0.006, f"{v:.4f}",
+                 ha="center", fontsize=11, fontweight="bold")
+    ax2.set_ylim(0, 0.26)
+    ax2.set_ylabel("Test R²")
+    ax2.set_title(f"② 그런데도 차이는 {row-grp:+.4f} — fold 변동(±{gsd:.4f}) 안이다",
+                  fontsize=10.2, pad=9, loc="left")
+    bare(ax2)
+
+    fig.suptitle("분할 감사 — 패널 자료를 행 단위로 나눈 것이 성능을 부풀렸는가",
+                 fontsize=11.8, fontweight="bold", y=1.04, x=0.008, ha="left")
+    save(fig, "fig15_audit.png")
+
+
 if __name__ == "__main__":
     print("[figures]")
     fig_benchmark()
@@ -576,4 +666,6 @@ if __name__ == "__main__":
     fig_heatmap()
     fig_case()
     fig_premium()
+    fig_panel()
+    fig_audit()
     print(f"→ {OUT}")
