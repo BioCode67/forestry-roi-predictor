@@ -120,6 +120,15 @@ def load_production():
 
 
 @st.cache_data(show_spinner=False)
+def load_management():
+    p = os.path.join(MODEL_DIR, "management_insights.json")
+    if not os.path.exists(p):
+        return None
+    with open(p, encoding="utf-8") as f:
+        return json.load(f)
+
+
+@st.cache_data(show_spinner=False)
 def load_insights():
     p = os.path.join(MODEL_DIR, "insights.json")
     if not os.path.exists(p):
@@ -839,8 +848,114 @@ with tab7:
 # ---------------------------------------------------------------------------
 # TAB 2 — 최적 출하시기
 # ---------------------------------------------------------------------------
+mgmt = load_management()
+SECTOR_TO_MGMT = {"밤재배업": "밤", "떫은감재배업": "떫은감", "버섯재배업": "버섯"}
+
 with tab2:
-    st.subheader(f"{sector_label} — 출하시기 추천")
+    # --- 임업통계 기반 출하시기 (KAMIS 미취급 품목까지 커버) -----------------
+    mkey = SECTOR_TO_MGMT.get(sector_label)
+    if mgmt and mkey and mkey in mgmt.get("품목별", {}):
+        m = mgmt["품목별"][mkey]
+        st.subheader(f"{sector_label} — 임업통계 기반 출하시기 분석")
+        st.caption(
+            "산림청 「임업경영실태조사」의 **출하시기 구성비**를 이용해 시기별 수취 단가를 "
+            "추정했습니다. KAMIS가 다루지 않는 밤·떫은감도 임업통계만으로 분석됩니다."
+        )
+
+        if "출하시기별_단가" in m:
+            e = m["출하시기별_단가"]
+            vals, ci = e["계열단가"], e.get("신뢰구간_90pct", {})
+            unid = set(e.get("식별불가계열", []))
+            names = [k for k in vals if k not in unid]
+            sc1, sc2 = st.columns([3, 2])
+            with sc1:
+                v = [vals[k] for k in names]
+                hi_i = int(np.argmax(v))
+                f = go.Figure()
+                f.add_trace(go.Bar(
+                    x=names, y=v,
+                    marker_color=[GREEN if i == hi_i else GREY for i in range(len(v))],
+                    error_y=dict(
+                        type="data", symmetric=False,
+                        array=[max(ci.get(k, [0, 0])[1] - vals[k], 0) for k in names],
+                        arrayminus=[max(vals[k] - ci.get(k, [0, 0])[0], 0) for k in names],
+                        color="#455A64"),
+                    text=[f"{x:,.0f}원" for x in v], textposition="outside"))
+                f.update_layout(height=340, yaxis_title="추정 수취 단가 (원/kg)",
+                                margin=dict(l=10, r=10, t=20, b=10),
+                                xaxis_title=f"출하시기 (표본 {e['표본']}호)")
+                st.plotly_chart(f, width="stretch")
+            with sc2:
+                st.dataframe(pd.DataFrame([
+                    {"출하시기": k, "추정단가(원)": vals[k],
+                     "90% 구간": f"{ci.get(k, ['-', '-'])[0]:,.0f}~{ci.get(k, ['-', '-'])[1]:,.0f}"
+                     if k in ci else "-",
+                     "평균 출하비중(%)": e["평균구성비_pct"].get(k)}
+                    for k in names]), width="stretch", hide_index=True)
+                st.metric("최고 / 최저 시기 격차", f"{e.get('격차_배', '-')} 배",
+                          delta=f"{e.get('최고시기')} {e.get('최고단가', 0):,.0f}원")
+            st.success(
+                f"**{mkey} 최적 출하시기 — {e.get('최고시기')}** "
+                f"(추정 {e.get('최고단가', 0):,.0f}원/kg). "
+                f"최저 시기인 {e.get('최저시기')}({e.get('최저단가', 0):,.0f}원) 대비 "
+                f"**{e.get('격차_배')}배**입니다."
+            )
+            st.warning("**해석 유의** — " + e.get("주의", ""))
+            if e.get("제외계열"):
+                st.caption("식별 불안정으로 제외된 계열: " + ", ".join(e["제외계열"]))
+
+        colA, colB = st.columns(2)
+        if "판매처별_단가" in m:
+            e2 = m["판매처별_단가"]
+            v2 = {k: x for k, x in e2["계열단가"].items()
+                  if k not in set(e2.get("식별불가계열", []))}
+            items = sorted(v2.items(), key=lambda kv: kv[1])
+            with colA:
+                st.subheader("판매처별 수취 단가")
+                f2 = go.Figure(go.Bar(
+                    x=[x for _, x in items], y=[k for k, _ in items], orientation="h",
+                    marker_color=[GREEN if i == len(items) - 1 else GREY
+                                  for i in range(len(items))],
+                    text=[f"{x:,.0f}원" for _, x in items], textposition="outside"))
+                f2.update_layout(height=300, margin=dict(l=10, r=10, t=10, b=10),
+                                 xaxis_title="추정 단가 (원/kg)")
+                st.plotly_chart(f2, width="stretch")
+                if items:
+                    st.caption(
+                        f"최고 {items[-1][0]} {items[-1][1]:,.0f}원 vs "
+                        f"최저 {items[0][0]} {items[0][1]:,.0f}원 "
+                        f"({e2.get('격차_배')}배). 판매처 구성비 회귀 추정치입니다."
+                    )
+        with colB:
+            st.subheader("저장·인증의 단가 효과")
+            rows = []
+            if "저장경험별_단가" in m:
+                s = m["저장경험별_단가"]
+                rows.append({"구분": "저장 경험 있음", "단가(원/kg)": s["저장경험 있음"]["단가중앙값"],
+                             "표본": s["저장경험 있음"]["표본"]})
+                rows.append({"구분": "저장 경험 없음", "단가(원/kg)": s["저장경험 없음"]["단가중앙값"],
+                             "표본": s["저장경험 없음"]["표본"]})
+            if "공식인증_프리미엄" in m:
+                c = m["공식인증_프리미엄"]
+                rows.append({"구분": "공식인증 보유", "단가(원/kg)": c["인증 보유"]["단가중앙값"],
+                             "표본": c["인증 보유"]["표본"]})
+                rows.append({"구분": "공식인증 없음", "단가(원/kg)": c["인증 없음"]["단가중앙값"],
+                             "표본": c["인증 없음"]["표본"]})
+            if rows:
+                st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
+                if "저장경험별_단가" in m:
+                    st.metric("저장 경험 단가차",
+                              f"{m['저장경험별_단가']['단가차_pct']:+.1f} %")
+                if "공식인증_프리미엄" in m:
+                    st.metric("공식인증 프리미엄",
+                              f"{m['공식인증_프리미엄']['프리미엄_pct']:+.1f} %")
+                st.caption(
+                    "저장 설비·자금 여력이나 인증 취득이 가능한 임가는 애초에 규모·품질이 "
+                    "다를 수 있습니다. 위 차이는 상관관계이며 순효과가 아닙니다."
+                )
+        st.markdown("---")
+
+    st.subheader(f"{sector_label} — KAMIS 월별 도매가 기반 추천")
     rec = recommend(sector_label, kamis)
 
     if rec["status"] == "not_applicable":
