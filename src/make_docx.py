@@ -148,7 +148,7 @@ def H2(doc, text):
 def P(doc, text, size=10.5, color=INK, indent=0, after=5):
     p = doc.add_paragraph()
     p.paragraph_format.space_after = Pt(after)
-    p.paragraph_format.line_spacing = 1.32
+    p.paragraph_format.line_spacing = 1.26
     if indent:
         p.paragraph_format.left_indent = Cm(indent)
     _rich(p, text, size, color)
@@ -158,7 +158,7 @@ def P(doc, text, size=10.5, color=INK, indent=0, after=5):
 def BUL(doc, text, size=10.5, level=0):
     p = doc.add_paragraph(style="List Bullet")
     p.paragraph_format.space_after = Pt(3)
-    p.paragraph_format.line_spacing = 1.32
+    p.paragraph_format.line_spacing = 1.26
     p.paragraph_format.left_indent = Cm(0.7 + 0.6 * level)
     _rich(p, text, size)
     return p
@@ -171,7 +171,7 @@ def NOTE(doc, text, kind="good"):
     p.paragraph_format.space_after = Pt(9)
     p.paragraph_format.left_indent = Cm(0.35)
     p.paragraph_format.right_indent = Cm(0.2)
-    p.paragraph_format.line_spacing = 1.4
+    p.paragraph_format.line_spacing = 1.34
     _rich(p, text, 10)
     _border(p, "left", "2E7D4F" if kind == "good" else "D97706", 20)  # pBdr가 shd보다 앞
     _shade(p, SH_NOTE if kind == "good" else SH_WARN)
@@ -299,7 +299,7 @@ def build():
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.paragraph_format.space_after = Pt(6)
     _add(p, "임가별 수익률 예측과 처방을 제공하는\n임업 의사결정 지원 시스템",
-         19, True, FOREST)
+         16.5, True, FOREST)
 
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -308,8 +308,8 @@ def build():
 
     p = doc.add_paragraph()
     p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.paragraph_format.space_after = Pt(16)
-    _font(p.add_run("팀명 : 임과 함께"), 12.5, True, INK)
+    p.paragraph_format.space_after = Pt(10)
+    _font(p.add_run("팀명 : 임과 함께"), 11.5, True, INK)
 
     TABLE(doc, [
         ["구분", "내용"],
@@ -360,11 +360,11 @@ def build():
            "서비스**까지 완성했습니다.")
 
     FIGURE(doc, "fig09_distribution.png",
-           "[그림 1] 임가 ROI 분포 — 평균은 대표값이 아니다", 12.1)
+           "[그림 1] 임가 ROI 분포 — 평균은 대표값이 아니다", 9.7)
     P(doc, "분포가 오른쪽으로 길게 늘어져 있어 평균(155.5%)이 중앙값(약 87%)보다 크게 위쪽에 "
            "놓입니다. 임가의 80%는 −38%에서 429% 사이에 흩어져 있습니다. 이 폭을 감춘 채 하나의 "
            "평균만 전달하는 것이 현행 통계 환류의 가장 큰 문제입니다.", 9.8, MUTED)
-    FIGURE(doc, "fig08_data.png", "[그림 2] 활용 데이터 구성 — 임업통계 4종(필수) + 공공데이터 3종", 11.1)
+    FIGURE(doc, "fig08_data.png", "[그림 2] 활용 데이터 구성 — 임업통계 4종(필수) + 공공데이터 3종", 8.8)
 
     # ══════════════════════════════════════════════════════════ 2)
     H1(doc, "2) 아이디어 기획 세부 내용")
@@ -425,7 +425,7 @@ def build():
         ["서비스", "FastAPI (Python) + Vue 3 / Vite / Apache ECharts"],
     ], widths=[2.6, 13.8])
 
-    FIGURE(doc, "fig07_pipeline.png", "[그림 3] 분석 파이프라인 전 과정", 12.8)
+    FIGURE(doc, "fig07_pipeline.png", "[그림 3] 분석 파이프라인 전 과정", 10.2)
 
     # ══════════════════════════════════════════════════════════ 3)
     H1(doc, "3) 데이터 분석 방법")
@@ -478,18 +478,15 @@ def build():
            "**총생산액·부가가치·등급별 수량**이 통과하고 있었습니다.")
     P(doc, "정규식 규칙을 확장하여 재학습한 결과, 최고 상관은 **0.885 → 0.344**(노동비 비중)로 "
            "정상화되었고 Test R²는 **0.9102 → 0.6243**으로 내려갔습니다.")
-    CODE(doc, '''LEAKY_PATTERNS = [
-    r"^소득$", r"^순수익$", r"^부가가치", r"평가액", r"생산액",
-    r"수확량", r"생산량", r"수량",
-    r"^생산비합계", r"^직접생산비$", r"^간접생산비$", r"^내급비$",
-    r"^타용도소비량$", r"^판매량", r"판매금액", r"^총수입",
-]
-# 투입 수량(비료 시비량 등)은 사전 결정 변수이므로 예외로 남긴다
-KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$")''')
+    P(doc, "차단 규칙은 소득·순수익·부가가치·평가액·생산액·수확량·생산량·수량·생산비합계·"
+           "직접생산비·간접생산비·내급비·타용도소비량·판매량·판매금액·총수입으로 넓혔습니다. "
+           "다만 **비료 시비량처럼 임가가 사전에 결정하는 투입 수량은 예외로 남겼습니다.** "
+           "이것까지 빼면 “무엇을 얼마나 넣을까”라는 질문에 답할 수 없게 됩니다. "
+           "규칙 전문은 별첨 src/preprocess_cost.py의 LEAKY_PATTERNS에 있습니다.")
     NOTE(doc, "**성능은 0.29 내려갔지만, 그 0.62가 실제로 쓸 수 있는 숫자입니다.** "
               "이 경위를 감추지 않고 보고서와 서비스 화면에 그대로 기재했습니다.", "warn")
 
-    FIGURE(doc, "fig02_leakage.png", "[그림 4] 데이터 누수 자체 적발 및 교정 경위", 12.5)
+    FIGURE(doc, "fig02_leakage.png", "[그림 4] 데이터 누수 자체 적발 및 교정 경위", 9.9)
 
     H2(doc, "마. 모델링 절차")
     TABLE(doc, [
@@ -549,7 +546,7 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
         ["개선 배수", "**×4.05**", "−7.1%", "**×5.95**", "−35.2%"],
     ], widths=[4.6, 2.9, 3.0, 2.9, 3.0], align_right=[1, 2, 3, 4], mark=[2, 3])
 
-    FIGURE(doc, "fig01_benchmark.png", "[그림 5] 동일 분할·동일 지표에서의 3종 모델 비교", 12.5)
+    FIGURE(doc, "fig01_benchmark.png", "[그림 5] 동일 분할·동일 지표에서의 3종 모델 비교", 9.9)
 
     NOTE(doc, "**결과의 정직한 해석.** Model A의 R² 0.1736은 절대 수치로 높지 않습니다. 이는 모델의 "
               "한계가 아니라 **임가경제조사 총괄표가 담을 수 있는 정보의 한계**입니다. 산의 수령·수종 "
@@ -594,7 +591,7 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
            "2020년까지 배워 2021년을 맞힐 때 R² 0.2200(기존 0.1404), 2021년까지 배워 "
            "2022년을 맞힐 때 0.3207(기존 0.2442)입니다.")
     FIGURE(doc, "fig14_panel.png",
-           "[그림 6] 패널 구조 활용 — 임가 단위 분할(좌)과 연도 단위 분할(우)", 14.9)
+           "[그림 6] 패널 구조 활용 — 임가 단위 분할(좌)과 연도 단위 분할(우)", 11.9)
     NOTE(doc, "**적용 범위와 한계.** 이 모델은 직전 연도 관측이 있는 행에만 쓸 수 있습니다"
               "(4,438행 중 2,186행, 49.3%). 임가번호가 2019~2022년은 네 자리(1001…), "
               "2023년은 다섯 자리(11021…)로 바뀌어 **2022년과 2023년 사이 연결이 완전히 "
@@ -637,7 +634,7 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
            "**한 해 경영비를 1,500만원에서 750만원으로 조정하면 예측 ROI는 195.9%**로 오릅니다. "
            "다만 이는 비율의 개선이며 소득 총액과는 다른 문제라는 점을 화면에 함께 표시합니다.")
     FIGURE(doc, "fig12_case.png",
-           "[그림 7] 사례 — 예측 근거의 분해(좌)와 반사실 처방(우)", 12.8)
+           "[그림 7] 사례 — 예측 근거의 분해(좌)와 반사실 처방(우)", 10.2)
     P(doc, "**④ 비교** — 조건이 가장 비슷한 임가 40곳의 ROI 중앙값은 146.2%이며, 그중 잘 버는 "
            "쪽은 247.6%입니다. 두 집단을 가르는 가장 큰 차이는 **면적당 일손(+300%)**과 "
            "**면적당 쓰는 돈(+270.9%)**이었습니다. 같은 금액을 쓰더라도 더 좁은 면적에 집중해 "
@@ -659,14 +656,14 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
            f"대추는 {age['대추']['최고구간']}({age['대추']['최고ROI']:.0f}%)이 정점입니다. "
            "임목 갱신 판단의 정량적 근거가 됩니다.")
 
-    FIGURE(doc, "fig06_insight.png", "[그림 8] 등급 전환 효과 및 수령 구간별 수익성", 12.5)
+    FIGURE(doc, "fig06_insight.png", "[그림 8] 등급 전환 효과 및 수령 구간별 수익성", 9.9)
 
     H2(doc, "바. 결과 ⑥ 지역 — 어디서 무엇이 잘 되고, 어디가 값을 더 받는가")
     P(doc, "임산물생산조사 196,579개 관측을 시군구 단위로 집계해 두 가지를 봤습니다. "
            "하나는 **어느 지역에서 어떤 품목이 실제로 수익을 내는가**이고, 다른 하나는 "
            "**같은 품목이라도 지역에 따라 단가가 얼마나 다른가**입니다.")
     FIGURE(doc, "fig11_heatmap.png",
-           "[그림 9] 지역×품목 수익성 — 조사 임가 15곳 이상인 조합만 표시", 11.4)
+           "[그림 9] 지역×품목 수익성 — 조사 임가 15곳 이상인 조합만 표시", 9.0)
     P(doc, "빈 칸이 많다는 사실 자체가 정보입니다. 대부분의 지역·품목 조합은 표본이 15곳에 "
            "미치지 못해 판단할 수 없습니다. 그런 칸에 억지로 숫자를 채우지 않았습니다.")
     P(doc, "특화도는 입지계수(LQ)로 쟀습니다. 그 지역 산업 구성에서 해당 품목이 전국 평균보다 "
@@ -710,7 +707,7 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
              f"작목 간 상관을 일률적으로 0.3으로 보는 보수적 가정에서도 효율 "
              f"{PF['보수가정']['효율']}로 결론이 유지됩니다.")
 
-    FIGURE(doc, "fig04_portfolio.png", "[그림 10] 작목 조합의 위험–수익 지도 (평균–분산 접근)", 10.3)
+    FIGURE(doc, "fig04_portfolio.png", "[그림 10] 작목 조합의 위험–수익 지도 (평균–분산 접근)", 8.2)
 
     ratio = bp["임가격차_pct"] / bp["연도변동_pct"]
     NOTE(doc, f"**그런데 더 중요한 발견이 있습니다.** 최적 조합의 연도 변동은 ±{bp['연도변동_pct']}%p인데, "
@@ -724,7 +721,7 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
            f"**{lead['선도임가']['ROI중앙값']}%**, 그 외({lead['표본']['이외임가']}곳)는 "
            f"**{lead['이외임가']['ROI중앙값']}%**입니다. 같은 품목, 같은 해에도 이만큼 벌어집니다.")
 
-    FIGURE(doc, "fig05_risk_split.png", "[그림 11] 수익 분산의 원천 분해 — 임가 효과 대 연도 효과", 11.3)
+    FIGURE(doc, "fig05_risk_split.png", "[그림 11] 수익 분산의 원천 분해 — 임가 효과 대 연도 효과", 9.0)
 
     H2(doc, "아. 결과 ⑧ 그 밖의 분석")
     BUL(doc, "**지역 특화도(LQ)** — 밤은 충남 LQ 6.73(전국 생산금액의 59.1%)으로 압도적 주산지.")
@@ -812,25 +809,24 @@ KEEP_DESPITE_PATTERN = re.compile(r"^(무기질|유기질)_.*_수량_단위당$"
     ], widths=[3.0, 13.4])
 
     H2(doc, "마. 확장 계획")
-    BUL(doc, "미확보 통계 3종(임산물소득조사·산림산업조사·산림휴양복지활동조사) 추가 결합")
-    BUL(doc, "임가경제조사 세부 파일 결합으로 Model A 설명력 보강")
-    BUL(doc, "산림경영지도원 현장 상담 도구로 배포")
+    P(doc, "미확보 통계 3종(임산물소득조사·산림산업조사·산림휴양복지활동조사)을 추가로 "
+           "결합하고, 임가경제조사 세부 파일로 Model A의 설명력을 보강한 뒤, "
+           "산림경영지도원의 현장 상담 도구로 배포하는 것을 다음 단계로 봅니다.")
 
     H2(doc, "바. 재현성 및 별첨")
     P(doc, "본 과제의 모든 결과는 코드로 재현됩니다. seed는 42로 고정했고, 전처리부터 학습·평가·"
            "산출물 생성까지 스크립트로 구성했습니다. **요강에 따라 소스코드 전체를 분량 외 별첨으로 "
            "제출합니다.**")
     TABLE(doc, [
-        ["구분", "파일"],
-        ["전처리", "src/preprocess.py, src/preprocess_cost.py"],
-        ["학습", "src/train_optuna.py, src/train_cost.py, src/train_quantile.py, src/train_panel.py"],
-        ["분석", "src/insights.py, src/production.py, src/management.py, src/subsidy.py, "
-               "src/region_map.py, src/portfolio.py, src/explain.py"],
-        ["외부 API", "src/kamis_client.py, src/kma_client.py, src/weather.py, src/weather_sgg.py"],
-        ["검증", "src/audit_split.py — 분할 감사"],
-        ["도표 생성", "src/make_figures.py, src/make_docx.py"],
-        ["서비스", "api/ (FastAPI), web/ (Vue 3)"],
-    ], widths=[2.4, 14.0])
+        ["구분", "내용"],
+        ["전처리 · 학습 · 검증",
+         "preprocess, preprocess_cost / train_optuna, train_cost, train_quantile, "
+         "train_panel, tune_panel / audit_split"],
+        ["분석 · 설명",
+         "insights, production, management, subsidy, region_map, portfolio, explain"],
+        ["외부 자료 · 서비스",
+         "kamis_client, shipping, kma_client, weather, weather_sgg / api(FastAPI), web(Vue 3)"],
+    ], widths=[4.0, 12.4])
 
     H2(doc, "사. 이 분석에서 지킨 원칙")
     NOTE(doc, "① **성능보다 정직을 택했습니다.** Model B의 R²를 0.91에서 0.62로 내린 것이 "

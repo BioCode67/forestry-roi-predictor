@@ -88,9 +88,27 @@ def para_html(z, rel_map, p) -> str:
     pPr = p.find(W + "pPr")
     css = []
     if pPr is not None:
+        # 문단 간격을 읽지 않으면 스타일시트 기본값(5pt)이 그대로 붙는다.
+        # 코드처럼 줄이 붙어 있어야 하는 곳에서 쪽수가 두 배로 불어난다.
+        sp = pPr.find(W + "spacing")
+        if sp is not None:
+            for attr, prop in (("before", "margin-top"), ("after", "margin-bottom")):
+                v = sp.get(W + attr)
+                if v is not None:
+                    css.append(f"{prop}:{int(v)/20:.1f}pt")
+            line = sp.get(W + "line")
+            rule = sp.get(W + "lineRule")
+            if line is not None:
+                css.append(f"line-height:{int(line)/240:.2f}"
+                           if rule in (None, "auto") else f"line-height:{int(line)/20:.1f}pt")
+        ind = pPr.find(W + "ind")
+        if ind is not None and ind.get(W + "left"):
+            css.append(f"margin-left:{int(ind.get(W + 'left'))/567:.2f}cm")
         shd = pPr.find(W + "shd")
         if shd is not None and shd.get(W + "fill") not in (None, "auto"):
-            css.append(f"background:#{shd.get(W + 'fill')};padding:9px 13px;border-radius:5px")
+            css.append(f"background:#{shd.get(W + 'fill')};"
+                       f"padding:{'2px 6px' if sp is not None and sp.get(W + 'after') == '0' else '9px 13px'};"
+                       "border-radius:4px")
         j = pPr.find(W + "jc")
         if j is not None:
             css.append(f"text-align:{ {'center':'center','right':'right','both':'justify'}.get(j.get(W + 'val'), 'left')}")
@@ -155,7 +173,7 @@ def build(src: str, dst: str) -> None:
     body { margin:0; background:#e9ecee; font-family:'Malgun Gothic','NanumGothic',sans-serif; }
     .page { width:21cm; min-height:29.7cm; margin:22px auto; padding:1.7cm 1.9cm 1.5cm;
             background:#fff; box-shadow:0 3px 18px rgba(0,0,0,.13); box-sizing:border-box; }
-    p { margin:0 0 5pt; line-height:1.32; font-size:10.5pt; word-break:keep-all; }
+    p { margin:0; line-height:1.32; font-size:10.5pt; word-break:keep-all; }
     .sp { height:6pt; }
     table { border-collapse:collapse; width:100%; margin:4pt 0 8pt; table-layout:fixed; }
     td { padding:2.6pt 5pt; vertical-align:middle; overflow-wrap:break-word; }
