@@ -136,6 +136,10 @@ def table_html(z, rel_map, tbl) -> str:
                 if shd is not None and shd.get(W + "fill") not in (None, "auto"):
                     css.append(f"background:#{shd.get(W + 'fill')}")
                 bd = pr.find(W + "tcBorders")
+                if bd is None:
+                    # tcBorders가 없으면 표 스타일(Table Grid)이 정한 테두리를 씁니다.
+                    # 여기서 아무것도 안 그리면 워드에는 있는 선이 PDF에서만 사라집니다.
+                    css.append("border:1px solid #9AA6AD")
                 if bd is not None:
                     for side in ("top", "bottom", "left", "right"):
                         e = bd.find(W + side)
