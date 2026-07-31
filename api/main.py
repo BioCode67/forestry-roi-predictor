@@ -168,6 +168,24 @@ def predict_item(inp: ItemInput):
         raise HTTPException(503, str(e))
 
 
+class AdviceInput(FarmInput):
+    목표: float | None = None
+
+
+@app.post("/api/advice")
+def advice(inp: AdviceInput):
+    """왜 이 숫자인지 · 무엇을 바꿔야 하는지 · 누구를 보면 되는지."""
+    try:
+        vals = inp.to_vals()
+        return {
+            "explain": svc.explain_a(vals),
+            "prescribe": svc.prescribe_a(vals, inp.목표),
+            "neighbors": svc.neighbors_a(vals),
+        }
+    except RuntimeError as e:
+        raise HTTPException(503, str(e))
+
+
 @app.get("/api/item/distribution")
 def item_distribution():
     return svc.item_roi_distribution()
@@ -202,6 +220,12 @@ def management():
 @app.get("/api/subsidy")
 def subsidy():
     return _need(svc.registry()["subsidy"], "subsidy")
+
+
+@app.get("/api/portfolio")
+def portfolio():
+    """작목 조합의 위험 분산 효과 — 평균·분산 접근."""
+    return _need(svc.registry()["portfolio"], "portfolio")
 
 
 @app.get("/api/region")

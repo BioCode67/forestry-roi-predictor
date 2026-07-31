@@ -17,6 +17,9 @@ sys.path.insert(0, os.path.join(ROOT, "src"))
 from preprocess import CATEGORICALS, FALLBACK_CODEBOOK, add_derived_features, parse_codebook  # noqa: E402
 from preprocess_cost import CODEBOOK as COST_CODEBOOK  # noqa: E402
 from preprocess_cost import add_derived_cost_features  # noqa: E402
+from explain import explain as shap_explain  # noqa: E402
+from explain import neighbors as find_neighbors  # noqa: E402
+from explain import prescribe as make_prescription  # noqa: E402
 from shipping import load_kamis, recommend  # noqa: E402
 
 MODEL_DIR = os.path.join(ROOT, "models")
@@ -76,6 +79,7 @@ def registry() -> dict:
         "item_profile": _json("item_cost_profile.json"),
         "region": _json("region_stats.json"),
         "weather_region": _json("weather_region.json"),
+        "portfolio": _json("portfolio.json"),
     }
     try:
         reg["codebook"] = parse_codebook()
@@ -302,6 +306,32 @@ def response_curve_b(item: str, overrides: dict, n=30) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+def explain_a(vals: dict) -> dict:
+    """예측 하나를 항목별로 분해합니다 (TreeSHAP)."""
+    reg = registry()
+    if reg["model_a"] is None:
+        raise RuntimeError("Model A가 학습되지 않았습니다.")
+    X = build_row_a(vals, reg["schema_a"])
+    return shap_explain(reg["model_a"], X, reg["schema_a"]["features"])
+
+
+def prescribe_a(vals: dict, target: float | None = None) -> dict:
+    """목표 수익률에 닿는 최소 변경을 찾습니다."""
+    reg = registry()
+    if target is None:
+        # 목표를 주지 않으면 같은 업종의 중앙값을 기본 목표로 둡니다.
+        # 상위 25%는 대다수 임가에게 한 번에 닿기 어려운 수준이라 처방이 비게 됩니다.
+        df = reg["df_a"]
+        peer = df[df["업종별"] == vals["업종별"]]["ROI"] if df is not None else None
+        target = float(peer.median()) if peer is not None and len(peer) else 100.0
+    return make_prescription(lambda v: predict_a(v)["roi"], vals, float(target),
+                             reg["codebook"])
+
+
+def neighbors_a(vals: dict) -> dict:
+    return find_neighbors(registry()["df_a"], vals)
+
+
 def shipping_for(sector_label: str) -> dict:
     reg = registry()
     return recommend(sector_label, reg["kamis"])

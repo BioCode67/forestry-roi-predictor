@@ -38,6 +38,7 @@ const NAV = [
   { to: '/shipping', label: '언제 팔까' },
   { to: '/market', label: '값은 얼마' },
   { to: '/insight', label: '더 버는 법' },
+  { to: '/risk', label: '몰아도 될까' },
   { to: '/detail', label: '자세한 진단' },
   { to: '/item', label: '작물별 자세히' },
   { to: '/model', label: '얼마나 맞나' },

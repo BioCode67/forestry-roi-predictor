@@ -28,6 +28,8 @@ export const api = {
   management: () => req('/api/management'),
   subsidy: () => req('/api/subsidy'),
   region: () => req('/api/region'),
+  portfolio: () => req('/api/portfolio'),
+  advice: (body) => req('/api/advice', { method: 'POST', body: JSON.stringify(body) }),
 }
 
 /* ---------------------------------------------------------------- 포맷터 */
