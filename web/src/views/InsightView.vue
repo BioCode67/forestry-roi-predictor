@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import EChart from '../components/EChart.vue'
 import MetricCard from '../components/MetricCard.vue'
 import SectionHead from '../components/SectionHead.vue'
+import PageHead from '../components/PageHead.vue'
 import DataState from '../components/DataState.vue'
 import { api, fmt } from '../lib/api'
 import { axisX, axisY, baseOption, palette, theme } from '../lib/charts'
@@ -152,7 +153,7 @@ const regionOption = computed(() => {
 <template>
   <main class="content">
     <div class="container">
-      <SectionHead
+      <PageHead
         title="어떻게 하면 더 벌 수 있을까요"
         desc="앞 화면이 '얼마 남을까'였다면, 여기는 '무엇을 바꾸면 나아질까'입니다. 등급을 올릴 때, 나무 나이에 따라, 잘하는 농가와 비교했을 때 얼마나 차이가 나는지 실제 조사 자료로 확인해 보세요."
         badge="전국 생산비 조사" badge-kind="green"

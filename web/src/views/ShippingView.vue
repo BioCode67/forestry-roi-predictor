@@ -3,6 +3,7 @@ import { computed, inject, ref, watch } from 'vue'
 import EChart from '../components/EChart.vue'
 import MetricCard from '../components/MetricCard.vue'
 import SectionHead from '../components/SectionHead.vue'
+import PageHead from '../components/PageHead.vue'
 import DataState from '../components/DataState.vue'
 import { api, fmt } from '../lib/api'
 import { axisX, axisY, baseOption, palette, theme } from '../lib/charts'
@@ -170,7 +171,7 @@ const kamisCharts = computed(() => {
 <template>
   <main class="content">
     <div class="container">
-      <SectionHead
+      <PageHead
         title="언제, 어디에 팔면 좋을까요"
         :desc="`${sectorLabel} 기준입니다. 같은 물건이라도 파는 시기와 파는 곳에 따라 받는 값이 달라집니다. 전국 농가가 실제로 언제·어디에 팔았고 얼마를 받았는지 조사한 자료로 계산했습니다.`"
         badge="전국 임가 조사 자료" badge-kind="sky"

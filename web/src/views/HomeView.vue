@@ -7,6 +7,7 @@
 import { computed, inject, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import Answer from '../components/Answer.vue'
+import Hero from '../components/Hero.vue'
 import TipList from '../components/TipList.vue'
 import Term from '../components/Term.vue'
 import EChart from '../components/EChart.vue'
@@ -241,19 +242,18 @@ const COST_PRESETS = [300, 700, 1500, 3000, 6000]
 </script>
 
 <template>
-  <main class="content">
-    <div class="container" style="max-width:1080px">
-      <div style="margin-bottom:22px">
-        <h1>내 산에서 한 해에 얼마나 남을까요?</h1>
-        <p class="section__desc" style="font-size:0.95rem">
-          아래 네 가지만 고르시면, 전국 임가 조사 자료로 계산한 예상 금액을 알려드립니다.
-          숫자를 바꾸시면 결과도 바로 바뀝니다.
-        </p>
-      </div>
+  <div>
+    <Hero
+      eyebrow="산림청 국가승인통계 · 전국 임가 조사"
+      title="내 산에서 한 해에 얼마나 남을까요?"
+      lead="네 가지만 고르시면 전국 임가를 조사한 자료로 계산한 예상 금액을 알려드립니다. 얼마를 쓰면 얼마가 남는지, 언제 어디에 팔면 값을 더 받는지까지 함께 봅니다."
+    />
 
-      <!-- 입력 -->
-      <div class="card" style="margin-bottom:22px">
-        <div class="card__body" style="padding-top:18px">
+  <main class="content" style="padding-top:0">
+    <div class="container" style="max-width:1080px">
+      <!-- 입력 — 히어로 위로 겹쳐 올린다 -->
+      <div class="card card--float">
+        <div class="card__body" style="padding-top:26px">
           <div class="grid grid--4">
             <div class="field">
               <label class="field__label">① 무엇을 하십니까</label>
@@ -412,9 +412,18 @@ const COST_PRESETS = [300, 700, 1500, 3000, 6000]
       </DataState>
     </div>
   </main>
+  </div>
 </template>
 
 <style scoped>
+.card--float {
+  margin-top: -44px;
+  margin-bottom: 26px;
+  box-shadow: var(--shadow-lg);
+  border-color: transparent;
+}
+@media (max-width: 820px) { .card--float { margin-top: -30px; } }
+
 .linkcard {
   display: flex; flex-direction: column; gap: 4px;
   padding: 15px 17px; border-radius: var(--r-md);

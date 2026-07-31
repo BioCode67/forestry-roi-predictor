@@ -1,7 +1,11 @@
 <script setup>
-import { onMounted, provide, reactive, ref } from 'vue'
-import { RouterLink, RouterView } from 'vue-router'
+import { computed, onMounted, provide, reactive, ref } from 'vue'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { api } from './lib/api'
+
+const route = useRoute()
+/** 히어로가 있는 화면에서는 헤더가 이미지 위에 얹힌다 */
+const floating = computed(() => route.path === '/')
 
 const meta = ref(null)
 const health = ref(null)
@@ -43,7 +47,7 @@ const NAV = [
 
 <template>
   <div class="app">
-    <header class="topbar">
+    <header class="topbar" :class="{ 'topbar--float': floating }">
       <div class="brand">
         <div class="brand__mark" aria-hidden="true">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">

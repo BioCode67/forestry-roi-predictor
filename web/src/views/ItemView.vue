@@ -29,8 +29,8 @@ const opts = (key) => {
   return d ? Object.entries(d).map(([code, label]) => ({ code: Number(code), label })) : []
 }
 
-/** 품목을 바꾸면 그 품목의 중앙값을 기본 입력으로 채운다 */
-watch(() => form.품목, (it) => {
+/** 선택한 품목의 중앙값을 기본 입력으로 채운다 */
+function fillMedians(it) {
   const med = meta.value?.item_medians?.[it]
   if (!med) return
   form.경영비 = Math.round(med['경영비'] ?? 5000000)
@@ -38,12 +38,17 @@ watch(() => form.품목, (it) => {
   form.농약비 = med['농약비_단위당'] != null ? Math.round(med['농약비_단위당']) : null
   form.총노동시간 = med['총노동시간_합계_단위당'] != null
     ? Math.round(med['총노동시간_합계_단위당']) : null
-})
+}
+watch(() => form.품목, fillMedians)
 
+// meta는 비동기로 도착한다. 목록이 채워지는 시점에 기본값도 함께 넣어야
+// 첫 화면부터 그 품목의 실제 중앙값으로 예측이 돈다.
 watch(items, (l) => {
-  if (l.length && !l.includes(form.품목)) form.품목 = l[0]
-  if (l.length) ready.value = true
-})
+  if (!l.length) return
+  if (!l.includes(form.품목)) form.품목 = l[0]
+  fillMedians(form.품목)
+  ready.value = true
+}, { immediate: true })
 
 let timer = null
 async function run() {
@@ -59,10 +64,12 @@ async function run() {
     loading.value = false
   }
 }
-watch([form, ready], () => {
+function schedule() {
   clearTimeout(timer)
   timer = setTimeout(run, 220)
-}, { deep: true, immediate: true })
+}
+watch(form, schedule, { deep: true })
+watch(ready, (v) => { if (v) schedule() }, { immediate: true })
 
 api.itemDistribution().then((d) => { dist.value = d }).catch(() => {})
 

@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import EChart from '../components/EChart.vue'
 import MetricCard from '../components/MetricCard.vue'
 import SectionHead from '../components/SectionHead.vue'
+import PageHead from '../components/PageHead.vue'
 import DataState from '../components/DataState.vue'
 import { api, fmt } from '../lib/api'
 import { axisX, axisY, baseOption, palette, theme } from '../lib/charts'
@@ -129,7 +130,7 @@ const allTrendOption = computed(() => {
 <template>
   <main class="content">
     <div class="container">
-      <SectionHead
+      <PageHead
         title="내 작물은 kg당 얼마 받나요"
         :desc="prod ? `전국 시·군마다 실제로 얼마에 팔렸는지 조사한 자료입니다 (${prod.연도[0]}~${prod.연도.at(-1)}년, ${fmt.int(prod.관측)}건). 같은 작물이라도 지역마다 받는 값이 꽤 다릅니다.` : ''"
         badge="전국 임산물 생산 조사" badge-kind="green"
